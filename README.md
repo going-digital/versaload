@@ -29,7 +29,7 @@ Now Versaload, which uses the full timing range of both methods:
 ```
 Note that common sequences like '0000...', '101010...' and '1111...' are all encoded at 244μs per bit, and even the worst case pattern '110110...' is encoded at 326μs per bit. For a random data sequence, the typical data rate is *3686 bits/sec*.
 
-## Faster data encoding on the Commodore 64 / VIC-20 / PET etc
+## Faster data encoding on the Commodore machines
 The ROM loader on the Commodore machines is universally recognised as being spectacularly slow due to its aggressive use of unnecessary data duplication and framing. However, a commonly used alternative was TurboTape.
 ```
  _
