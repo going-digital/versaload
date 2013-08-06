@@ -7,6 +7,10 @@
 
         org loadbase
 
+        ; For debugging
+        jp      alert
+
+
         ; Sync:
         ;
         ; Look for a specific 32 step data pattern
