@@ -123,7 +123,7 @@ readdata:
         call    measure_symbol
         cp      0               ; 7T
 thres_3_5 equ .pc-1
-        jr      c,bits_1_       ; 12T/7T
+        jp      c,bits_1_       ; 10T
         rl      d               ; 8T
         jr      nc,del01        ; 12T/7T
         ld      (hl),d          ; 7T
@@ -137,7 +137,7 @@ thres_2_5 equ .pc-1
         ld      d,$01           ; 7T
         inc     hl              ; 6T
 ret02:  ld      a,(108+15)/29   ; 7T
-        jp      readdataend     ; 10T [108T since edge]
+        jp      readdataend     ; 10T [111T since edge]
 
 del01:  nop                     ; 4T
         jp      ret01           ; 10T
@@ -150,14 +150,14 @@ del04:  nop                     ; 4T
 del05:  nop                     ; 4T
         jp      ret05           ; 10T
 
-bits_1_:rl      d               ; 8T            [22T]
+bits_1_:rl      d               ; 8T            [20T]
         jr      nc,del03        ; 12T/7T
         ld      (hl),d          ; 7T
         ld      d,$01           ; 7T
         inc     hl              ; 6T
 ret03:  cp      0               ; 7T
 thres_5_5 equ .pc-1
-        jr      c,bits_11_      ; 12T/7T        [12/7 + 56]
+        jp      c,bits_11_      ; 10T        [10 + 54]
         rl      d               ; 8T
         jr      nc,del04        ; 12T/7T
         ld      (hl),d          ; 7T
@@ -171,14 +171,14 @@ thres_4_5 equ .pc-1
         ld      d,$01           ; 7T
         inc     hl              ; 6T
 ret05:  ld      a,(159+15)/29   ; 7T
-        jp      readdataend     ; 10T   [157T since edge]
+        jp      readdataend     ; 10T   [158T since edge]
 
 del06:  nop                     ; 4T
         jp      ret06           ; 10T
 del07:  nop                     ; 4T
         jp      ret07           ; 10T
 
-bits_11_: ;[68T]
+bits_11_: ;[64T]
         rl      d               ; 8T
         jr      nc,del06        ; 12T/7T
         ld      (hl),d          ; 7T
@@ -200,7 +200,7 @@ thres_6_5 equ .pc-1
         ld      d,$01           ; 7T
         inc     hl              ; 6T
 ret08:  ld      a,(213+15)/29   ; 7T
-        jp      readdataend     ; 10T [211T] **TOO*LONG**
+        jp      readdataend     ; 10T [207T] **TOO*LONG**
 
 del08:  nop                     ; 4T
         jp      ret08           ; 10T
@@ -209,7 +209,7 @@ del09:  nop                     ; 4T
 del10:  nop                     ; 4T
         jp      ret10           ; 10T
 
-bits_111_:;[122T]
+bits_111_:;[118T]
         rl      d               ; 8T
         jr      nc,del09        ; 12T/7T
         ld      (hl),d          ; 7T
@@ -223,13 +223,20 @@ thres_8_5 equ .pc-1
         ld      d,$01           ; 7T
         inc     hl              ; 6T
 ret10:  
-        ld      a,(206+15)/29   ; 7T [206T] **TOO*LONG**
+        ld      a,(206+15)/29   ; 7T [202T] **TOO*LONG**
 readdataend:
         ;
         ; TODO: Handling of binary datastream goes here
         ;
         ; TODO: Count bytes, then jump to either readdata or sync
         ;
+
+smc99:  ;ld      a,NN            ; 7T
+        ;ld      (smc99+1),d     ;
+        ;cp      d
+        ; If the shift register is smaller than last time, a byte has been written
+        ;jp      nc,?
+        ;inc     hl
         cp      h,b
         jp      nz,?
         cp      l,c
