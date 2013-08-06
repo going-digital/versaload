@@ -65,3 +65,6 @@ This gives a data rate of around *6632 bit∙s⁻¹* for the same data rate, but
 ```
 This gives a predicted rate of around *6562 bit∙s⁻¹*, a small sacrifice for the code complexity reduction.
 That is the theory, but practical tests will be conducted when the code is functionally complete. Experiments are ongoing…
+
+## Prerequisites
+Requires [Make](http://www.gnu.org/software/make/), [Python](http://www.python.org) and [Pasmo](http://pasmo.speccy.org) to build. [Fuse](http://fuse-emulator.sourceforge.net) and Fuse utils (tzxlist) are also used for debugging.
