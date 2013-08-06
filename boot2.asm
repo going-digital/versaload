@@ -66,88 +66,120 @@ calibrate:
         add     hl,de                   ; 11T
         ; HL now contains the duration of four 8 period delays.
         ; Multiply by 8:
-        add     hl,hl
-        add     hl,hl
+        add     hl,hl                   ; 11T
+        add     hl,hl                   ; 11T
         ; H contains 0.5 period delay
-        ld      b,h                     ; B: 0.5 periods
-        add     hl,hl
+        ld      b,h                     ; 4T B: 0.5 periods
+        add     hl,hl                   ; 11T
         ; H now contains the average measured 1 period time
-        ld      c,h                     ; C: 1 period
-        add     hl,hl
-        ld      d,h                     ; D: 2 periods
-        add     hl,hl
-        ld      e,h                     ; E: 4 periods
-        add     hl,hl                   ; H: 8 periods
+        ld      c,h                     ; 4T C: 1 period
+        add     hl,hl                   ; 11T
+        ld      d,h                     ; 4T D: 2 periods
+        add     hl,hl                   ; 11T
+        ld      e,h                     ; 4T E: 4 periods
+        add     hl,hl                   ; 4T H: 8 periods
         ; Now to calculate the thresholds
         ; Done in Gray code order for fastest calculation speed.
-        ld      a,b
+        ld      a,b                     ; 4T
         add     a,c
-        ld      (thres_1_5),a
+        ld      (thres_1_5),a           ; 13T
         add     a,d
-        ld      (thres_3_5),a
+        ld      (thres_3_5),a           ; 13T
         sub     a,c
-        ld      (thres_2_5),a
+        ld      (thres_2_5),a           ; 13T
         add     a,e
-        ld      (thres_6_5),a
+        ld      (thres_6_5),a           ; 13T
         sub     a,d
-        ld      (thres_4_5),a
+        ld      (thres_4_5),a           ; 13T
         add     a,c
-        ld      (thres_5_5),a
+        ld      (thres_5_5),a           ; 13T
         add     a,d
-        ld      (thres_7_5),a
+        ld      (thres_7_5),a           ; 13T
         ld      a,h
         add     a,b
-        ld      (thres_8_5),a
+        ld      (thres_8_5),a           ; 13T
 
         ; Readdata:
         ;
         ; Read symbols, quantise to the correct period and pass to the
         ; decoding engine to extract real data.
-readdata:
-        ld      a,NN
-        call    measure_symbol
-thres_5_5       equ     .pc+1
-        cp      0
-        jr      c,symbols_6_7_8_9
-thres_3_5       equ     .pc+1
-        cp      0
-        jr      c,symbols_4_5
-thres_2_5       equ     .pc+1
-        cp      0
-        ld      a,0
-        jr      nc,got_symbol
-        ld      a,1
-        jr      got_symbol
-symbols_6_7_8_9:
-thres_7_5       equ     .pc+1
-        cp      0
-        jr      c,symbols_8_9
-thres_6_5       equ     .pc+1
-        cp      0
-        ld      a,4
-        jr      nc,got_symbol
-        ld      a,5
-        jr      got_symbol
-symbols_4_5:
-thres_4_5       equ     .pc+1
-        cp      0
-        ld      a,2
-        jr      nc,got_symbol
-        ld      a,3
-        jr      got_symbol
-symbols_8_9:
-thres_8_5       equ     .pc+1
-        ld      a,6
-        jr      nc,got_symbol
-        ld      a,7
-got_symbol:
         ;
-        ; TODO: Range coder goes here
+        ; Tree Length Encoding
+        ;    / 220us  00
+        ;   /\ 330us  01
+        ;  / / 440us  100
+        ; / /\ 550us  101
+        ; \/ / 660us  1100
+        ;  \/\ 770us  1101
+        ;   \/ 880us  1110
+        ;    \ 990us  1111
+
+        ld      a,NN
+readdata:
+        call    measure_symbol
+        cp      0
+thres_3_5 equ .pc-1
+        jr      c,bits_1_
+        call    addbit  ; '0'
+        cp      0
+thres_2_5 equ .pc-1
+        call    addbit  ; '0' or '1'
+        ld      a,?
+        jr      readdataend
+bits_1_:call    addbit
+        cp      0
+thres_5_5 equ .pc-1
+        jr      c,bits_11_
+        call    addbit 
+        cp      0
+thres_4_5 equ .pc-1
+        call    addbit ; '0' or '1'
+        ld      a,?
+        jr      readdataend
+bits_11_:
+        call    addbit
+        cp      0
+thres_7_5 equ .pc-1
+        jr      c,bits_111_
+        call    addbit
+        cp      0
+thres_6_5 equ .pc-1
+        call    addbit
+        ld      a,?
+        jr      readdataend
+bits_111_:
+        call    addbit
+        cp      0
+thres_8_5 equ .pc-1
+        call    addbit
+        ld      a,?
+readdataend:
         ;
         ; TODO: Handling of binary datastream goes here
         ;
         jp      alert
 
+
+
+        ; Addbit:
+        ;
+        ; Store carry bit at H'L', using E' as shift register
+        ;
+        ; Preserves all registers except E'H'L'.
+        ;
+        ; Fixed execution time - always takes either 63 or 64T.
+        ;
+addbit: push    af      ;  10T
+        exx             ;   4T
+        rl      e       ;   8T
+        jr      nc,abdel; 12T/7T
+        ld      (hl),e  ;     7T
+        ld      e,$01   ;     7T
+        inc     hl      ;     6T
+abret:  exx             ;   4T
+        pop     af      ;  10T
+abdel:  nop             ; 4T
+        jr      abret   ; 12T 
 
 
         ;
