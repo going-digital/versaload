@@ -115,7 +115,7 @@ calibrate:
         ;    \ 990us  1111
 
         ; This part is unrolled for speed. The entire loop from edge to edge
-        ; must complete within 200T otherwise the next pulse measurement may
+        ; must complete within 700T otherwise the next pulse measurement may
         ; be compromised.
 
         ld      a,NN            ; 7T
@@ -124,111 +124,41 @@ readdata:
 smc01:  cp      0               ; 7T
 thres_3_5 equ smc01+1
         jp      c,bits_1_       ; 10T
-        rl      d               ; 8T
-        jr      nc,del01        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret01:
+        call    addbit
 smc02:  cp      0               ; 7T
 thres_2_5 equ smc02+1
-        rl      d               ; 8T
-        jr      nc,del02        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret02:  ld      a,(108+15)/29   ; 7T
+        call    addbit
+        ld      a,(108+15)/29   ; 7T
         jp      readdataend     ; 10T [111T since edge]
 
-del01:  nop                     ; 4T
-        jp      ret01           ; 10T
-del02:  nop                     ; 4T
-        jp      ret02           ; 10T
-del03:  nop                     ; 4T
-        jp      ret03           ; 10T
-del04:  nop                     ; 4T
-        jp      ret04           ; 10T
-del05:  nop                     ; 4T
-        jp      ret05           ; 10T
-
-bits_1_:rl      d               ; 8T            [20T]
-        jr      nc,del03        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret03:
+bits_1_:call    addbit
 smc03:  cp      0               ; 7T
 thres_5_5 equ smc03+1
         jp      c,bits_11_      ; 10T        [10 + 54]
-        rl      d               ; 8T
-        jr      nc,del04        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret04:
+        call    addbit
 smc04:  cp      0               ; 7T
 thres_4_5 equ smc04+1
-        rl      d               ; 8T
-        jr      nc,del05        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret05:  ld      a,(159+15)/29   ; 7T
+        call    addbit
+        ld      a,(159+15)/29   ; 7T
         jp      readdataend     ; 10T   [158T since edge]
 
-del06:  nop                     ; 4T
-        jp      ret06           ; 10T
-del07:  nop                     ; 4T
-        jp      ret07           ; 10T
-
 bits_11_: ;[64T]
-        rl      d               ; 8T
-        jr      nc,del06        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret06:
+        call    addbit
 smc06:  cp      0               ; 7T
 thres_7_5 equ smc06+1
         jr      c,bits_111_     ; 12T/7T
-        rl      d               ; 8T
-        jr      nc,del07        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret07:
+        call    addbit
 smc07:  cp      0               ; 7T
 thres_6_5 equ smc07+1
-        rl      d               ; 8T
-        jr      nc,del08        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
+        call    addbit
 ret08:  ld      a,(213+15)/29   ; 7T
         jp      readdataend     ; 10T [207T] **TOO*LONG**
 
-del08:  nop                     ; 4T
-        jp      ret08           ; 10T
-del09:  nop                     ; 4T
-        jp      ret09           ; 10T
-del10:  nop                     ; 4T
-        jp      ret10           ; 10T
-
 bits_111_:;[118T]
-        rl      d               ; 8T
-        jr      nc,del09        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret09:  
+        call    addbit
 smc08:  cp      0               ; 7T
 thres_8_5 equ smc08+1
-        rl      d               ; 8T
-        jr      nc,del10        ; 12T/7T
-        ld      (hl),d          ; 7T
-        ld      d,$01           ; 7T
-        inc     hl              ; 6T
-ret10:  
+        call    addbit
         ld      a,(206+15)/29   ; 7T [202T] **TOO*LONG**
 readdataend:
         ;
@@ -262,6 +192,14 @@ alertlp:out     (c),a
         rlca
         jr      alertlp
 
+addbit: rl      d
+        jr      nc,del10
+        ld      (hl),d
+        ld      d,$01
+        inc     hl
+retab:  ret
+delab:  nop
+        jp      retab
 
         ; measure_symbol and measure_half_symbol
         ;
