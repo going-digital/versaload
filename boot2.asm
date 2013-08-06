@@ -10,8 +10,8 @@
         ; This has multiple functions:
         ;   1) Take up the unknown slack before the next pattern
         ;   2) Handle any inversion in the audio system
-sync:
         xor     a
+sync:
 sync_loop:
         call    measure_half_symbol
         sub     sync_threshold          ; 7T
@@ -81,22 +81,22 @@ calibrate:
         ; Now to calculate the thresholds
         ; Done in Gray code order for fastest calculation speed.
         ld      a,b                     ; 4T
-        add     a,c
+        add     a,c                     ; 4T
         ld      (thres_1_5),a           ; 13T
-        add     a,d
+        add     a,d                     ; 4T
         ld      (thres_3_5),a           ; 13T
-        sub     a,c
+        sub     a,c                     ; 4T
         ld      (thres_2_5),a           ; 13T
-        add     a,e
+        add     a,e                     ; 4T
         ld      (thres_6_5),a           ; 13T
-        sub     a,d
+        sub     a,d                     ; 4T
         ld      (thres_4_5),a           ; 13T
-        add     a,c
+        add     a,c                     ; 4T
         ld      (thres_5_5),a           ; 13T
-        add     a,d
+        add     a,d                     ; 4T
         ld      (thres_7_5),a           ; 13T
-        ld      a,h
-        add     a,b
+        ld      a,h                     ; 4T
+        add     a,b                     ; 4T
         ld      (thres_8_5),a           ; 13T
 
         ; Readdata:
@@ -114,73 +114,131 @@ calibrate:
         ;   \/ 880us  1110
         ;    \ 990us  1111
 
-        ld      a,NN
+        ; This part is unrolled for speed. The entire loop from edge to edge
+        ; must complete within 200T otherwise the next pulse measurement may
+        ; be compromised.
+
+        ld      a,NN            ; 7T
 readdata:
         call    measure_symbol
-        cp      0
+        cp      0               ; 7T
 thres_3_5 equ .pc-1
-        jr      c,bits_1_
-        call    addbit  ; '0'
-        cp      0
+        jr      c,bits_1_       ; 12T/7T
+        rl      d               ; 8T
+        jr      nc,del01        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret01:  cp      0               ; 7T
 thres_2_5 equ .pc-1
-        call    addbit  ; '0' or '1'
-        ld      a,?
-        jr      readdataend
-bits_1_:call    addbit
-        cp      0
+        rl      d               ; 8T
+        jr      nc,del02        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret02:  ld      a,(108+15)/29   ; 7T
+        jp      readdataend     ; 10T [108T since edge]
+
+del01:  nop                     ; 4T
+        jp      ret01           ; 10T
+del02:  nop                     ; 4T
+        jp      ret02           ; 10T
+del03:  nop                     ; 4T
+        jp      ret03           ; 10T
+del04:  nop                     ; 4T
+        jp      ret04           ; 10T
+del05:  nop                     ; 4T
+        jp      ret05           ; 10T
+
+bits_1_:rl      d               ; 8T            [22T]
+        jr      nc,del03        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret03:  cp      0               ; 7T
 thres_5_5 equ .pc-1
-        jr      c,bits_11_
-        call    addbit 
-        cp      0
+        jr      c,bits_11_      ; 12T/7T        [12/7 + 56]
+        rl      d               ; 8T
+        jr      nc,del04        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret04:  cp      0               ; 7T
 thres_4_5 equ .pc-1
-        call    addbit ; '0' or '1'
-        ld      a,?
-        jr      readdataend
-bits_11_:
-        call    addbit
-        cp      0
+        rl      d               ; 8T
+        jr      nc,del05        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret05:  ld      a,(159+15)/29   ; 7T
+        jp      readdataend     ; 10T   [157T since edge]
+
+del06:  nop                     ; 4T
+        jp      ret06           ; 10T
+del07:  nop                     ; 4T
+        jp      ret07           ; 10T
+
+bits_11_: ;[68T]
+        rl      d               ; 8T
+        jr      nc,del06        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret06:  cp      0               ; 7T
 thres_7_5 equ .pc-1
-        jr      c,bits_111_
-        call    addbit
-        cp      0
+        jr      c,bits_111_     ; 12T/7T
+        rl      d               ; 8T
+        jr      nc,del07        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret07:  cp      0               ; 7T
 thres_6_5 equ .pc-1
-        call    addbit
-        ld      a,?
-        jr      readdataend
-bits_111_:
-        call    addbit
-        cp      0
+        rl      d               ; 8T
+        jr      nc,del08        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret08:  ld      a,(213+15)/29   ; 7T
+        jp      readdataend     ; 10T [211T] **TOO*LONG**
+
+del08:  nop                     ; 4T
+        jp      ret08           ; 10T
+del09:  nop                     ; 4T
+        jp      ret09           ; 10T
+del10:  nop                     ; 4T
+        jp      ret10           ; 10T
+
+bits_111_:;[122T]
+        rl      d               ; 8T
+        jr      nc,del09        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret09:  cp      0               ; 7T
 thres_8_5 equ .pc-1
-        call    addbit
-        ld      a,?
+        rl      d               ; 8T
+        jr      nc,del10        ; 12T/7T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+ret10:  
+        ld      a,(206+15)/29   ; 7T [206T] **TOO*LONG**
 readdataend:
         ;
         ; TODO: Handling of binary datastream goes here
         ;
+        ; TODO: Count bytes, then jump to either readdata or sync
+        ;
+        cp      h,b
+        jp      nz,?
+        cp      l,c
+        jp      nz,?
+        jp      sync
+
+
+        ; For debugging
         jp      alert
-
-
-
-        ; Addbit:
-        ;
-        ; Store carry bit at H'L', using E' as shift register
-        ;
-        ; Preserves all registers except E'H'L'.
-        ;
-        ; Fixed execution time - always takes either 63 or 64T.
-        ;
-addbit: push    af      ;  10T
-        exx             ;   4T
-        rl      e       ;   8T
-        jr      nc,abdel; 12T/7T
-        ld      (hl),e  ;     7T
-        ld      e,$01   ;     7T
-        inc     hl      ;     6T
-abret:  exx             ;   4T
-        pop     af      ;  10T
-abdel:  nop             ; 4T
-        jr      abret   ; 12T 
-
 
         ;
         ; Test code: flash border in distinctive pattern and make noise
@@ -202,11 +260,12 @@ alertlp:out     (c),a
         ; On exit:
         ;       A: number of T states to edge, in multiples of 29.
         ; Corrupts:
-        ;       BC
+        ;       B'C'
         ;
 measure_symbol:
         call    measure_half_symbol
 measure_half_symbol:
+        exx
         ld      c,$FE           ; Mic port
 ms_link:jr      ms_1            ; * Selfmodifying code
 ms_1:   ld      b,ms_0 - ms_1
@@ -220,17 +279,5 @@ ms_0:   ld      b,ms_0 - ms_0
 ms0lp:  inc     a
         IN_F_C
         jp      pe,ms0lp
+        exx
         ret
-
-
-
-
-
-
-
-
-
-
-
-
-
