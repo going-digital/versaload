@@ -8,14 +8,14 @@ FUSE=/Applications/Fuse.app/Contents/MacOS/Fuse
 
 boot1.bin: boot2.bin
 
-#test.tzx: boot1.bin
-#    $(PYTHON) buildtzx.py
+versaload.tzx: boot1.bin
+	$(PYTHON) buildtzx.py
 #    $(TZXLIST) test.tzx
 
-#fuse: versaload.tzx
-#    $(FUSE) --machine plus2 --no-detect-loader --tape versaload.tzx
+fuse: versaload.tzx
+	$(FUSE) --machine plus2 --no-detect-loader --tape versaload.tzx
 
-all: boot1.bin
+all: versaload.tzx
 
 clean:
 	rm -f *.bin

@@ -4,3 +4,7 @@
 pasmo
 
 gl
+
+.DS_Store
+
+*.tzx
