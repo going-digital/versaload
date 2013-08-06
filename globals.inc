@@ -19,3 +19,5 @@ sync_train_1    equ     $CC
 sync_train_2    equ     $66
 sync_train_3    equ     $66
 sync_train_4    equ     $CC
+
+sync_threshold  equ     +(2118+15)/29   ; 2118T = 605us
