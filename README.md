@@ -23,7 +23,7 @@ The Commodore C64 was known for its extremely slow loading, so both commercial d
  __
 |  |__| '1' in 326μs (326μs per bit), probability 50.0%
 ```
-This gives a data rate of around *3690 bits/sec*. But all this information tells us we can use pulse lengths between 216μs and 977μs, so why not use them all? Because the longer the symbols, the slower the load. But techniques such as Huffman coding and range coding can maximise the data rate, taking advantage of the longer symbols. Versaload proposes the following timings:
+This gives a data rate of around *3690 bits/sec*. But all this information tells us we can use pulse lengths between 216μs and 977μs, so why not use them all? Because the longer the symbols, the slower the load. But techniques such as [Huffman coding](http://en.wikipedia.org/wiki/Huffman_coding) and [range coding](http://en.wikipedia.org/wiki/Range_encoding) can maximise the data rate, taking advantage of the longer symbols. Versaload proposes the following timings:
 ```
  _
 | |_|               220μs, probability 27.3%
