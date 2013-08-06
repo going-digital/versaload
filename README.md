@@ -63,5 +63,5 @@ This gives a data rate of around *6632 bit∙s⁻¹* for the same data rate, but
 |        |________| 990μs,  6.25%, '1111' (248μs per bit)
 
 ```
-This gives a predicted rate of around *6562 bit∙s⁻¹*, a small sacrifice for the speed gains.
+This gives a predicted rate of around *6562 bit∙s⁻¹*, a small sacrifice for the code complexity reduction.
 That is the theory, but practical tests will be conducted when the code is functionally complete. Experiments are ongoing…
