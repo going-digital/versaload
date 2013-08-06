@@ -121,16 +121,17 @@ calibrate:
         ld      a,NN            ; 7T
 readdata:
         call    measure_symbol
-        cp      0               ; 7T
-thres_3_5 equ .pc-1
+smc01:  cp      0               ; 7T
+thres_3_5 equ smc01+1
         jp      c,bits_1_       ; 10T
         rl      d               ; 8T
         jr      nc,del01        ; 12T/7T
         ld      (hl),d          ; 7T
         ld      d,$01           ; 7T
         inc     hl              ; 6T
-ret01:  cp      0               ; 7T
-thres_2_5 equ .pc-1
+ret01:
+smc02:  cp      0               ; 7T
+thres_2_5 equ smc02+1
         rl      d               ; 8T
         jr      nc,del02        ; 12T/7T
         ld      (hl),d          ; 7T
@@ -155,16 +156,18 @@ bits_1_:rl      d               ; 8T            [20T]
         ld      (hl),d          ; 7T
         ld      d,$01           ; 7T
         inc     hl              ; 6T
-ret03:  cp      0               ; 7T
-thres_5_5 equ .pc-1
+ret03:
+smc03:  cp      0               ; 7T
+thres_5_5 equ smc03+1
         jp      c,bits_11_      ; 10T        [10 + 54]
         rl      d               ; 8T
         jr      nc,del04        ; 12T/7T
         ld      (hl),d          ; 7T
         ld      d,$01           ; 7T
         inc     hl              ; 6T
-ret04:  cp      0               ; 7T
-thres_4_5 equ .pc-1
+ret04:
+smc04:  cp      0               ; 7T
+thres_4_5 equ smc04+1
         rl      d               ; 8T
         jr      nc,del05        ; 12T/7T
         ld      (hl),d          ; 7T
@@ -184,16 +187,18 @@ bits_11_: ;[64T]
         ld      (hl),d          ; 7T
         ld      d,$01           ; 7T
         inc     hl              ; 6T
-ret06:  cp      0               ; 7T
-thres_7_5 equ .pc-1
+ret06:
+smc06:  cp      0               ; 7T
+thres_7_5 equ smc06+1
         jr      c,bits_111_     ; 12T/7T
         rl      d               ; 8T
         jr      nc,del07        ; 12T/7T
         ld      (hl),d          ; 7T
         ld      d,$01           ; 7T
         inc     hl              ; 6T
-ret07:  cp      0               ; 7T
-thres_6_5 equ .pc-1
+ret07:
+smc07:  cp      0               ; 7T
+thres_6_5 equ smc07+1
         rl      d               ; 8T
         jr      nc,del08        ; 12T/7T
         ld      (hl),d          ; 7T
@@ -215,8 +220,9 @@ bits_111_:;[118T]
         ld      (hl),d          ; 7T
         ld      d,$01           ; 7T
         inc     hl              ; 6T
-ret09:  cp      0               ; 7T
-thres_8_5 equ .pc-1
+ret09:  
+smc08:  cp      0               ; 7T
+thres_8_5 equ smc08+1
         rl      d               ; 8T
         jr      nc,del10        ; 12T/7T
         ld      (hl),d          ; 7T
