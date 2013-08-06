@@ -9,21 +9,21 @@ Most cassette loading systems use two symbols, one twice the length of the other
  _______
 |       |_______| 977μs (3420T), probability 50.0%, '1'
 ```
-Note that a sequence of '1's loads at half the speed of '0's. This gives a data rate of around *1364 bit∙s⁻¹*. In an attempt to speed up loading speeds and make cassette tapes harder to copy, games manufacturers developed faster loaders that were still reliable enough to make it through replication and work on consumer equipment. One of the fastest was used by [Microsphere](http://www.worldofspectrum.org/infoseekpub.cgi?regexp=^Microsphere$ ), which runs at double the speed of the default loader, *2729 bit∙s⁻¹*:
+Note that a sequence of '1's loads at half the speed of '0's. This gives a data rate of around *1535 bit∙s⁻¹*. In an attempt to speed up loading speeds and make cassette tapes harder to copy, games manufacturers developed faster loaders that were still reliable enough to make it through replication and work on consumer equipment. One of the fastest was used by [Microsphere](http://www.worldofspectrum.org/infoseekpub.cgi?regexp=^Microsphere$ ), which runs at double the speed of the default loader, *3070 bit∙s⁻¹*:
 ```
  _
 | |_|               244μs (855T), probability 50.0%, '0'
  ___
 |   |___|           489μs (1710T), probability 50.0%, '1'
 ```
-The Commodore C64 was known for its extremely slow loading, so both commercial developers and home users were quick to speed things up. One of the most popular home speedup systems was [Turbotape](http://codebase64.org/doku.php?id=base:turbotape_loader_source), which was both reliable and fast. This uses timing similar to Microsphere, but note that the '1' bit is not double the length of the '0' bit.
+The Commodore C64 was known for its extremely slow loading, so both commercial developers and home users were quick to speed things up. One of the most popular home speedup systems was [Turbotape](http://codebase64.org/doku.php?id=base:turbotape_loader_source), which was both reliable and fast. This uses timing similar to Microsphere, but note that the '1' bit is not double the length of the '0' bit, which gives a substantial speed boost.
 ```
  _
 | |_|               216μs, 50.0%, '0'
  __
 |  |__|             326μs, 50.0%, '1'
 ```
-This gives a data rate of around *3690 bit∙s⁻¹*. But all this information tells us we can use pulse lengths between 216μs and 977μs, so why not use them all? Because the longer the symbols, the slower the load. But techniques such as [Huffman coding](http://en.wikipedia.org/wiki/Huffman_coding) and [range coding](http://en.wikipedia.org/wiki/Range_encoding) can maximise the data rate, taking advantage of the longer symbols. The bit rate is maximised by the following proportions:
+This gives a data rate of around *3849 bit∙s⁻¹*. But all this information tells us we can use pulse lengths between 216μs and 977μs, so why not use them all? Because the longer the symbols, the slower the load. But techniques such as [Huffman coding](http://en.wikipedia.org/wiki/Huffman_coding) and [range coding](http://en.wikipedia.org/wiki/Range_encoding) can maximise the data rate, taking advantage of the longer symbols. The bit rate is maximised by the following proportions:
 ```
  _
 | |_|               220μs, 23.5%
@@ -63,7 +63,7 @@ This gives a data rate of around *6632 bit∙s⁻¹* for the same data rate, but
 |        |________| 990μs,  6.25%, '1111' (248μs per bit)
 
 ```
-This gives a predicted rate of around *6562 bit∙s⁻¹*, a small sacrifice for the code complexity reduction.
+This gives a predicted rate of around *6562 bit∙s⁻¹*, a small sacrifice for the code complexity reduction. This is 4.2 times the speed of the Spectrum default loader.
 That is the theory, but practical tests will be conducted when the code is functionally complete. Experiments are ongoing…
 
 ## Prerequisites
