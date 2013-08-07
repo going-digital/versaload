@@ -67,4 +67,4 @@ This gives a predicted rate of around *6562 bit∙s⁻¹*, a small sacrifice for
 That is the theory, but practical tests will be conducted when the code is functionally complete. Experiments are ongoing…
 
 ## Prerequisites
-Requires [Make](http://www.gnu.org/software/make/), [Python](http://www.python.org) and [Pasmo](http://pasmo.speccy.org) to build. [Fuse](http://fuse-emulator.sourceforge.net) and Fuse utils (tzxlist) are also used for debugging.
+Requires [Make](http://www.gnu.org/software/make/), [Python](http://www.python.org) and [Pasmo](http://pasmo.speccy.org) to build. [Fuse](http://fuse-emulator.sourceforge.net) and Fuse utils (tzxlist) are also used for debugging. This code incorporates Ian Chapman's Python TZX library.
