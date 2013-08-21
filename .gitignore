@@ -8,3 +8,7 @@ gl
 .DS_Store
 
 *.tzx
+
+*.mp3
+
+*.wav
