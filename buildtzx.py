@@ -143,7 +143,7 @@ while data.length > 0:
                 data=data[4:]
 
 payloadblock = Blk_DRB(sampledata = datamod.tobytes())
-payloadblock.tstatespersample(110)
+payloadblock.tstatespersample(110*3.5)
 
 tape.add_block(payloadblock)
 
