@@ -7,9 +7,8 @@
 
         org loadbase
 
-        ; For debugging
-        jp      alert
-
+        ld      a,border_black
+        out     ($fe),a
 
         ; Sync:
         ;
@@ -21,28 +20,33 @@
 sync:
 sync_loop:
         call    measure_half_symbol
-        sub     sync_threshold          ; 7T
+        cp      sync_threshold          ; 7T carry set if time > threshold
+        ccf
         rl      e                       ; 8T
         rl      d                       ; 8T
         rl      l                       ; 8T
         rl      h                       ; 8T
         ld      a,sync_train_1          ; 7T
         cp      h                       ; 4T
-        ld      a,+(69+15)/29           ; 7T
+        ld      a,+(69+16)/33           ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 69T
         ld      a,sync_train_2          ; 7T
         cp      l                       ; 4T
-        ld      a,+(94+15)/29           ; 7T
+        ld      a,+(94+16)/33           ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 94T
         ld      a,sync_train_3          ; 7T
         cp      d                       ; 4T
-        ld      a,+(119+15)/29          ; 7T
+        ld      a,+(119+16)/33          ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 119T
         ld      a,sync_train_4          ; 7T
         cp      e                       ; 4T
-        ld      a,+(144+15)/29          ; 7T
+        ld      a,+(144+16)/33          ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 144T
         ; Sync has been received, 139T after edge so far
+
+        ld      a,border_blue
+        out     ($fe),a
+
 
         ; Calibrate:
         ;
@@ -52,7 +56,7 @@ sync_loop:
         ; as well as tape stretch, which gives much more accurate
         ; descrimination between symbols.
 calibrate:
-        ld      hl,+(161+19+19+19+15)/29; 10T
+        ld      hl,+(161+19+19+19+16)/33; 10T
         ld      d,h                     ; 4T
         ld      e,l                     ; 4T
         xor     a                       ; 4T = 161T total
@@ -71,6 +75,11 @@ calibrate:
         call    measure_symbol
         ld      e,a                     ; 4T
         add     hl,de                   ; 11T
+
+        ld      a,border_red
+        out     ($fe),a
+inf:    jr      inf
+
         ; HL now contains the duration of four 8 period delays.
         ; Multiply by 8:
         add     hl,hl                   ; 11T
@@ -89,7 +98,6 @@ calibrate:
         ; Done in Gray code order for fastest calculation speed.
         ld      a,b                     ; 4T
         add     a,c                     ; 4T
-        ;ld      (thres_1_5),a           ; 13T
         add     a,d                     ; 4T
         ld      (thres_3_5),a           ; 13T
         sub     c                       ; 4T
@@ -105,6 +113,10 @@ calibrate:
         ld      a,h                     ; 4T
         add     a,b                     ; 4T
         ld      (thres_8_5),a           ; 13T
+
+        ; For debugging
+        jp      alert
+
 
         ; Readdata:
         ;
@@ -143,7 +155,7 @@ smc01:  cp      0               ; 7T    thres_3_5 stored here
         call    addbit
 smc02:  cp      0               ; 7T    thres_2_5 stored here
         call    addbit
-        ld      a,+(108+15)/29  ; 7T
+        ld      a,+(108+16)/33  ; 7T
         jp      readdataend     ; 10T
 
 bits_1_:call    addbit
@@ -152,7 +164,7 @@ smc03:  cp      0               ; 7T    thres_5_5 stored here
         call    addbit
 smc04:  cp      0               ; 7T    thres_4_5 stored here
         call    addbit
-        ld      a,+(159+15)/29  ; 7T
+        ld      a,+(159+16)/33  ; 7T
         jp      readdataend     ; 10T
 
 bits_11_:
@@ -162,14 +174,14 @@ smc06:  cp      0               ; 7T    thres_7_5 stored here
         call    addbit
 smc07:  cp      0               ; 7T    thres_6_5 stored here
         call    addbit
-ret08:  ld      a,+(213+15)/29  ; 7T
+ret08:  ld      a,+(213+16)/33  ; 7T
         jp      readdataend     ; 10T
 
 bits_111_:
         call    addbit
 smc08:  cp      0               ; 7T    thres_8_5 stored here
         call    addbit
-        ld      a,+(206+15)/29  ; 7T
+        ld      a,+(206+16)/33  ; 7T
 
 readdataend:
         ;
@@ -197,6 +209,15 @@ readdataend:
 
         ;
         ; Test code: flash border in distinctive pattern and make noise
+        ; 00010111 White
+        ; 00101110 Yellow
+        ; 01011100 Green
+        ; 10111000 Black
+        ; 01110001 Blue
+        ; 11100010 Red
+        ; 11000101 Cyan
+        ; 10001011 Magenta
+
         ;
 alert:  ld      a,$17   ; De Bruijn sequence k=2 n=3
         ld      c,$fe
@@ -223,26 +244,22 @@ delab:  nop
         ; On exit:
         ;       A: number of T states to edge, in multiples of 29.
         ; Corrupts:
-        ;       B'C'
+        ;       B
         ;
 measure_symbol:
-        call    measure_half_symbol
+        call    measure_half_symbol ; 17T
+        ; This is a good place to put a short piece of code with a known
+        ; execution time. There is around 220µs of time available here,
+        ; executed once per incoming symbol.
+        ; 'A' must be updated with compensation for the time lost.
 measure_half_symbol:
-        exx
-        ld      c,$FE           ; Mic port
-        ex      af,af'
-        ld      a,ms_0 - ms_1
-        ld      (ms_link+1),a
-        ex      af,af'
-ms_link:jr      ms_1            ; * Selfmodifying code
-ms_1:   
-ms1lp:  inc     a               ;  7T
-        IN_F_C                  ; 12T in f,(c) undocumented instruction
-        jp      po,ms1lp        ; 10T
-        ret
-ms_0:   
-ms0lp:  inc     a
-        IN_F_C
-        jp      pe,ms0lp
-        exx
-        ret
+        ld      b,a             ; 4T
+mslp:   inc     b               ; 4T Cycle time is 33T
+        in      a,($fe)         ;11T
+        bit     6,a             ; 8T
+ms_cmp: jp      z,mslp          ;10T Selfmodified between Z and NZ
+        ld      a,(ms_cmp)      ;13T
+        xor     $08             ; 8T Swap jp z and jp nz opcodes
+        ld      (ms_cmp),a      ;13T
+        ld      a,b             ; 4T
+        ret                     ;10T

@@ -8,6 +8,7 @@ import sys
 sys.path.append("modules")
 from tzx import *
 from zxfile import *
+import bitstring
 from bitstring import BitArray
 
 tape = TZX()
@@ -63,29 +64,39 @@ loaderblock2.bitpulse0(bitpulse0_ROM_min*timeMargin)
 loaderblock2.bitpulse1(bitpulse1_ROM_min*timeMargin)
 loaderblock2.pilotpulse(pilotpulse_ROM_min*timeMargin)
 loaderblock2.pilottone(pilottone_data_ROM_min*timeMargin)
-loaderblock2.pause(10)
+loaderblock2.pause(0)
 tape.add_block(loaderblock2)
 
 """
-Payloads
+Payload setup
 """
-
 # Sync pattern to synchronise loader with stream
-versaHeader = BitArray('2*0xccf0f0,4*0xf0ccf0,2*0xccf0f0')
+# Starts at 5.42110s into audio
+versaHeader = BitArray('10*0xcc,2*0xf0c,4*0xc3c,2*0xf0c')
+
 # Calibration - correct for speed of tape playback
 # 4 cycles of 880us
 versaHeader.append(BitArray('4*0xff00'))
 
+blockNumber = 0x0000
+
+"""
+Payload blocks
+"""
+
 # Generate bitstream
 rawdata = open("test.scr","rb").read()
 
-# Load address
-loadAddress = 0x8000
-data = BitArray(uintle=loadAddress, length=16)
-# End address
+# Generate block header
+loadAddress = 0x4000 # Base address of screen memory
 endAddress = loadAddress + len(rawdata)
-data.append(BitArray(uintle=endAddress, length=16))
-# Data
+checkSum = 0x0000 # Placeholder for now
+
+
+# Build payload block
+# See https://github.com/going-digital/versaload/wiki/Payload
+#
+data = bitstring.pack('<4H',blockNumber,loadAddress,endAddress,checkSum)
 data.append(BitArray(bytes=rawdata))
 
 # Modulate datastream
@@ -138,7 +149,7 @@ while data.length > 0:
             elif data[0:4]=='0b1110':
                 datamod.append(symbol1110)
                 data=data[4:]
-            else:
+            else: # data[0:4] must be '0b1111'
                 datamod.append(symbol1111)
                 data=data[4:]
 
