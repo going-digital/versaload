@@ -28,19 +28,19 @@ sync_loop:
         rl      h                       ; 8T
         ld      a,sync_train_1          ; 7T
         cp      h                       ; 4T
-        ld      a,+(69+16)/33           ; 7T
+        ld      a,+(69+16)/32           ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 69T
         ld      a,sync_train_2          ; 7T
         cp      l                       ; 4T
-        ld      a,+(94+16)/33           ; 7T
+        ld      a,+(94+16)/32           ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 94T
         ld      a,sync_train_3          ; 7T
         cp      d                       ; 4T
-        ld      a,+(119+16)/33          ; 7T
+        ld      a,+(119+16)/32          ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 119T
         ld      a,sync_train_4          ; 7T
         cp      e                       ; 4T
-        ld      a,+(144+16)/33          ; 7T
+        ld      a,+(144+16)/32          ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 144T
         ; Sync has been received, 139T after edge so far
 
@@ -56,7 +56,7 @@ sync_loop:
         ; as well as tape stretch, which gives much more accurate
         ; descrimination between symbols.
 calibrate:
-        ld      hl,+(161+19+19+19+16)/33; 10T
+        ld      hl,+(161+19+19+19+16)/32; 10T
         ld      d,h                     ; 4T
         ld      e,l                     ; 4T
         xor     a                       ; 4T = 161T total
@@ -76,9 +76,8 @@ calibrate:
         ld      e,a                     ; 4T
         add     hl,de                   ; 11T
 
-        ld      a,border_red
-        out     ($fe),a
-inf:    jr      inf
+        ld      a,border_red            ;  7T
+        out     ($fe),a                 ; 11T
 
         ; HL now contains the duration of four 8 period delays.
         ; Multiply by 8:
@@ -114,10 +113,6 @@ inf:    jr      inf
         add     a,b                     ; 4T
         ld      (thres_8_5),a           ; 13T
 
-        ; For debugging
-        jp      alert
-
-
         ; Readdata:
         ;
         ; Read symbols, quantise to the correct period and pass to the
@@ -151,11 +146,12 @@ thres_8_5 equ smc08+1
 readdata:
         call    measure_symbol
 smc01:  cp      0               ; 7T    thres_3_5 stored here
-        jp      c,bits_1_       ; 10T
+        jp      nc,bits_1_       ; 10T
+        ccf
         call    addbit
 smc02:  cp      0               ; 7T    thres_2_5 stored here
         call    addbit
-        ld      a,+(108+16)/33  ; 7T
+        ld      a,+(108+16)/32  ; 7T
         jp      readdataend     ; 10T
 
 bits_1_:call    addbit
@@ -164,7 +160,7 @@ smc03:  cp      0               ; 7T    thres_5_5 stored here
         call    addbit
 smc04:  cp      0               ; 7T    thres_4_5 stored here
         call    addbit
-        ld      a,+(159+16)/33  ; 7T
+        ld      a,+(159+16)/32  ; 7T
         jp      readdataend     ; 10T
 
 bits_11_:
@@ -174,14 +170,14 @@ smc06:  cp      0               ; 7T    thres_7_5 stored here
         call    addbit
 smc07:  cp      0               ; 7T    thres_6_5 stored here
         call    addbit
-ret08:  ld      a,+(213+16)/33  ; 7T
+ret08:  ld      a,+(213+16)/32  ; 7T
         jp      readdataend     ; 10T
 
 bits_111_:
         call    addbit
 smc08:  cp      0               ; 7T    thres_8_5 stored here
         call    addbit
-        ld      a,+(206+16)/33  ; 7T
+        ld      a,+(206+16)/32  ; 7T
 
 readdataend:
         ;
@@ -240,9 +236,9 @@ delab:  nop
         ; or next full symbol (total of high and low period)
         ;
         ; On entry:
-        ;       A: number of T states since last edge, in multiples of 29.
+        ;       A: number of T states since last edge, in multiples of 32.
         ; On exit:
-        ;       A: number of T states to edge, in multiples of 29.
+        ;       A: number of T states to edge, in multiples of 32.
         ; Corrupts:
         ;       B
         ;
@@ -254,9 +250,9 @@ measure_symbol:
         ; 'A' must be updated with compensation for the time lost.
 measure_half_symbol:
         ld      b,a             ; 4T
-mslp:   inc     b               ; 4T Cycle time is 33T
+mslp:   inc     b               ; 4T Cycle time is 32T
         in      a,($fe)         ;11T
-        bit     6,a             ; 8T
+        and     $40             ; 7T
 ms_cmp: jp      z,mslp          ;10T Selfmodified between Z and NZ
         ld      a,(ms_cmp)      ;13T
         xor     $08             ; 8T Swap jp z and jp nz opcodes

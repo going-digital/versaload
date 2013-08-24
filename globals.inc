@@ -26,7 +26,7 @@ sync_train_3    equ     $66
 sync_train_4    equ     $CC
 
 ; Symbols are 220 and 440µs long, so set threshold at geometric mean, 311µs
-sync_threshold  equ     +(1089+15)/33   ; 1089T = 311us = sqrt(220 * 440)
+sync_threshold  equ     +(1089+16)/32   ; 1089T = 311us = sqrt(220 * 440)
 
 ;
 border_black    equ     $08
