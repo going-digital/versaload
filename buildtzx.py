@@ -154,6 +154,9 @@ while data.length > 0:
                 datamod.append(symbol1111)
                 data=data[4:]
 
+# Add final tape state (so last symbol can be decoded)
+datamod.append('0b1')
+
 payloadblock = Blk_DRB(sampledata = datamod.tobytes())
 payloadblock.tstatespersample(110*3.5)
 
