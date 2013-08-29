@@ -151,9 +151,14 @@ selfmodified    equ     0       ; Dummy value placeholder for selfmodified code
 
 ; Set up to load payload
         ; Edge + 186T
-        ;ld      hl,payload_base         ; 10T
-        ld      hl,$4000 ; Debug
+        ld      hl,payload_base         ; 10T
+        ;ld      hl,$4000 ; Debug
         ld      bc,payload_end_header   ; 10T
+        ld      a,b                     ; 4T
+        ld      (end_h),a               ; 13T
+        ld      a,c                     ; 4T
+        ld      (end_l),a               ; 13T
+
         ld      d,$01                   ; 7T
         xor     a                       ; 4T
         ld      (payload_data),a        ; 13T
