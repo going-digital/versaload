@@ -327,6 +327,12 @@ ms_cmp: jp      z,mslp          ;10T Selfmodified between Z and NZ
         ld      a,(ms_cmp)      ;13T
         xor     $08             ; 7T Swap jp z and jp nz opcodes
         ld      (ms_cmp),a      ;13T
+
+        ld      a,$0a
+        out     ($fe),a
+        ld      a,$08
+        out     ($fe),a
+
         ld      a,b             ; 4T
         ret                     ;10T
 
