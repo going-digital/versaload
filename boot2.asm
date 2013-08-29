@@ -7,8 +7,9 @@
 
         org loadbase
 
-        ld      a,border_black
-        out     ($fe),a
+        ; Debug: Black border indicates boot2 is running
+        ld      a,border_black          ; 7T
+        out     ($fe),a                 ; 11T
 
         ; Sync:
         ;
@@ -16,14 +17,18 @@
         ; This has multiple functions:
         ;   1) Take up the unknown slack before the next pattern
         ;   2) Handle any inversion in the audio system
-        xor     a
+        ld      a,-2                    ; 7T TODO: Timings in sync loop need adjusting for code change here
+sync_2:
+        inc     a                       ; 4T
+        inc     a                       ; 4T
 sync:
 sync_loop:
-        call    measure_half_symbol
+        call    measure_half_symbol     ; 17T
         cp      sync_threshold          ; 7T carry set if time > threshold
-        ccf
+        ccf                             ; 4T
         rl      e                       ; 8T
         rl      d                       ; 8T
+;        adc     hl,hl                   ; 15T faster option?
         rl      l                       ; 8T
         rl      h                       ; 8T
         ld      a,sync_train_1          ; 7T
@@ -43,10 +48,13 @@ sync_loop:
         ld      a,+(144+16)/32          ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 144T
         ; Sync has been received, 139T after edge so far
+        ; Edge+139T
 
-        ld      a,border_blue
-        out     ($fe),a
+        ; Debug: Blue border indicates synchronisation was successful
+        ld      a,border_blue           ; 7T
+        out     ($fe),a                 ; 11T
 
+        ; Edge+157T
 
         ; Calibrate:
         ;
@@ -56,43 +64,45 @@ sync_loop:
         ; as well as tape stretch, which gives much more accurate
         ; descrimination between symbols.
 calibrate:
-        ld      hl,+(161+19+19+19+16)/32; 10T
+        ld      hl,+(179+19+19+19+16)/32; 10T
+        ; HL incorporates corrections from all 4 calibration pulses
         ld      d,h                     ; 4T
         ld      e,l                     ; 4T
-        xor     a                       ; 4T = 161T total
+        xor     a                       ; 4T Edge+179T
         call    measure_symbol
         ld      e,a                     ; 4T
         add     hl,de                   ; 11T
-        xor     a                       ; 4T = 19T
+        xor     a                       ; 4T Edge+19T
         call    measure_symbol
         ld      e,a                     ; 4T
         add     hl,de                   ; 11T
-        xor     a                       ; 4T = 19T
+        xor     a                       ; 4T Edge+19T
         call    measure_symbol
         ld      e,a                     ; 4T
         add     hl,de                   ; 11T
-        xor     a                       ; 4T = 19T
+        xor     a                       ; 4T Edge+19T
         call    measure_symbol
         ld      e,a                     ; 4T
-        add     hl,de                   ; 11T
+        add     hl,de                   ; 11T Edge+15T
 
+        ; Debug: Blue border indicates calibration is complete
         ld      a,border_red            ;  7T
-        out     ($fe),a                 ; 11T
+        out     ($fe),a                 ; 11T Edge+33T
 
         ; HL now contains the duration of four 8 period delays.
         ; Multiply by 8:
         add     hl,hl                   ; 11T
-        add     hl,hl                   ; 11T
+        add     hl,hl                   ; 11T Edge+55T
         ; H contains 0.5 period delay
         ld      b,h                     ; 4T B: 0.5 periods
-        add     hl,hl                   ; 11T
+        add     hl,hl                   ; 11T Edge+70T
         ; H now contains the average measured 1 period time
         ld      c,h                     ; 4T C: 1 period
         add     hl,hl                   ; 11T
         ld      d,h                     ; 4T D: 2 periods
         add     hl,hl                   ; 11T
         ld      e,h                     ; 4T E: 4 periods
-        add     hl,hl                   ; 4T H: 8 periods
+        add     hl,hl                   ; 4T H: 8 periods Edge+93T
         ; Now to calculate the thresholds
         ; Done in Gray code order for fastest calculation speed.
         ld      a,b                     ; 4T
@@ -111,7 +121,10 @@ calibrate:
         ld      (thres_7_5),a           ; 13T
         ld      a,h                     ; 4T
         add     a,b                     ; 4T
-        ld      (thres_8_5),a           ; 13T
+        ld      (thres_8_5),a           ; 13T Edge+186T
+
+        ; Edge + 186T
+        ;jp      alert
 
         ; Readdata:
         ;
@@ -132,103 +145,147 @@ calibrate:
         ; must complete within 700T otherwise the next pulse measurement may
         ; be compromised.
 
-thres_2_5 equ smc02+1
-thres_3_5 equ smc01+1
-thres_4_5 equ smc04+1
-thres_5_5 equ smc03+1
-thres_6_5 equ smc07+1
-thres_7_5 equ smc06+1
-thres_8_5 equ smc08+1
+selfmodified    equ     0       ; Dummy value placeholder for selfmodified code
 
 ; TODO: Recalculate timings through this section
 
-        ld      a,0             ; 7T
+; Set up to load payload
+        ; Edge + 186T
+        ld      hl,payload_base         ; 10T
+        ld      bc,payload_end_header   ; 10T
+        ld      d,$01                   ; 7T
+        xor     a                       ; 4T
+        ld      (payload_data),a        ; 13T
+        ld      a,+(230+16)/32-2        ; 7T Edge+230T
+readdata_2:
+        inc     a                       ; 4T
+readdata_1:
+        inc     a                       ; 4T
 readdata:
-        call    measure_symbol
-smc01:  cp      0               ; 7T    thres_3_5 stored here
-        jp      nc,bits_1_       ; 10T
-        ccf
-        call    addbit
-smc02:  cp      0               ; 7T    thres_2_5 stored here
-        call    addbit
-        ld      a,+(108+16)/32  ; 7T
-        jp      readdataend     ; 10T
+        call    measure_symbol          ; 17T
+smc01:  cp      selfmodified            ; 7T    thres_3_5 stored here
+        ccf                             ; 4T
+        jp      c,bits_1_               ; 10T Edge+21T
+        call    addbit                  ; 61T
+smc02:  cp      selfmodified            ; 7T    thres_2_5 stored here
+        ccf                             ; 4T
+        call    addbit                  ; 61T
+        ld      a,+(171+16)/32          ; 7T
+        jp      readdataend             ; 10T Edge+171T
 
-bits_1_:call    addbit
-smc03:  cp      0               ; 7T    thres_5_5 stored here
-        jp      c,bits_11_      ; 10T        [10 + 54]
-        call    addbit
-smc04:  cp      0               ; 7T    thres_4_5 stored here
-        call    addbit
-        ld      a,+(159+16)/32  ; 7T
-        jp      readdataend     ; 10T
+        ; Called at Edge+21T
+bits_1_:call    addbit                  ; 61T
+smc03:  cp      selfmodified            ; 7T    thres_5_5 stored here
+        ccf                             ; 4T
+        jp      c,bits_11_              ; 10T Edge+103T
+        call    addbit                  ; 61T
+smc04:  cp      selfmodified            ; 7T    thres_4_5 stored here
+        ccf                             ; 4T
+        call    addbit                  ; 61T
+        ld      a,+(253+16)/32          ; 7T
+        jp      readdataend             ; 10T Edge+253T
 
+        ; Called at Edge+103T
 bits_11_:
-        call    addbit
-smc06:  cp      0               ; 7T    thres_7_5 stored here
-        jr      c,bits_111_     ; 12T/7T
-        call    addbit
-smc07:  cp      0               ; 7T    thres_6_5 stored here
-        call    addbit
-ret08:  ld      a,+(213+16)/32  ; 7T
-        jp      readdataend     ; 10T
+        call    addbit                  ; 61T
+smc06:  cp      selfmodified            ; 7T    thres_7_5 stored here
+        ccf                             ; 4T
+        jp      c,bits_111_             ; 10T Edge+185T
+        call    addbit                  ; 61T
+smc07:  cp      selfmodified            ; 7T    thres_6_5 stored here
+        ccf                             ; 4T
+        call    addbit                  ; 61T
+ret08:  ld      a,+(335+16)/32          ; 7T
+        jp      readdataend             ; 10T Edge+335T
 
+        ; Called at Edge+185T
 bits_111_:
-        call    addbit
-smc08:  cp      0               ; 7T    thres_8_5 stored here
-        call    addbit
-        ld      a,+(206+16)/32  ; 7T
+        call    addbit                  ; 61T
+smc08:  cp      selfmodified            ; 7T    thres_8_5 stored here
+        ccf                             ; 4T
+        call    addbit                  ; 61T
+        ld      a,+(325+16)/32          ; 7T Edge+325T
+
+thres_2_5       equ     smc02+1
+thres_3_5       equ     smc01+1
+thres_4_5       equ     smc04+1
+thres_5_5       equ     smc03+1
+thres_6_5       equ     smc07+1
+thres_7_5       equ     smc06+1
+thres_8_5       equ     smc08+1
 
 readdataend:
-        ;
-        ; TODO: Handling of binary datastream goes here
-        ;
-        ; TODO: Count bytes, then jump to either readdata or sync
-        ;
-        ; TODO: Need to test for end-of-block condition
-        ;
-        ld      e,a
-        ld      a,h
-        cp      b
-        ld      a,e
-        jp      nz,readdata
-        ld      a,l
-        cp      c
-        ld      a,e
-        jp      nz,readdata
-        ; HL = BC, end of block condition so resync
-        jp      sync
+        ; Up to 4 bits can be added for each symbol.
+        ; Once BC=HL, the block is over.
+        ld      e,a                     ; 4T
+        ld      a,h                     ; 4T
+sm10:   cp      selfmodified            ; 7T
+        ld      a,e                     ; 4T
+        jp      nz,readdata_1           ; 10T Edge+A+26T (add 32T)
+        ld      a,l                     ; 4T
+        cp      c                       ; 4T
+        ld      a,e                     ; 4T
+        jp      nz,readdata_1           ; 10T Edge+A+48T (add 32T)
+        ; Data is complete
+        ld      a,(payload_data)        ; 13T
+        and     a                       ; 4T
+        ld      a,e                     ; 7T
+        jp      nz,sync_2               ; 10T Edge+A+82T (add 64T)
 
+        ; Payload header loaded:
+        ; Set up load and end address
+        ; TODO: Handle block number
+        ; TODO: Handle checksum
+
+        ld      hl,(loadaddr)           ; 16T 
+        ld      bc,endaddr              ; 20T
+        inc     a                       ; 4T
+        ld      (payload_data),a        ; 13T Edge+A+135T
+        add     a,4                     ; 7T
+        jp      readdata                ; Edge+A+142T (add 128T)
 
         ; For debugging
         jp      alert
 
-        ;
-        ; Test code: flash border in distinctive pattern and make noise
-        ; 00010111 White
-        ; 00101110 Yellow
-        ; 01011100 Green
-        ; 10111000 Black
-        ; 01110001 Blue
-        ; 11100010 Red
-        ; 11000101 Cyan
-        ; 10001011 Magenta
 
+
+        ; alert
         ;
+        ; Distinctive effect for debugging use.
+        ; Flashes border Wh/Ye/Gr/Bk/Bl/Re/Cy/Ma
+        ;
+        ; 7 bytes
 alert:  ld      a,$17   ; De Bruijn sequence k=2 n=3
-        ld      c,$fe
-alertlp:out     (c),a
+alertlp:out     ($fe),a
         rlca
         jr      alertlp
 
-addbit: rl      d
-        jr      nc,delab
-        ld      (hl),d
-        ld      d,$01
-        inc     hl
-retab:  ret
-delab:  nop
-        jp      retab
+
+        ; addbit
+        ;
+        ; Adds the carry flag contents into the incoming data shift register
+        ;
+        ; On entry:
+        ;       carry: Bit to add
+        ; On exit:
+        ;       DHL: updated
+        ; Caller must preserve:
+        ;       D: shift register
+        ;       HL: memory pointer
+        ; Execution time
+        ;       CALL addbit takes either 
+        ;               17+44 T states (7/8 times)
+        ;               17+45 T states (1/8 times)
+        ;       Assume CALL addbit takes 61T
+        ;
+addbit: rl      d               ; 8T
+        jr      nc,delab        ; 7/12T
+        ld      (hl),d          ; 7T
+        ld      d,$01           ; 7T
+        inc     hl              ; 6T
+retab:  ret                     ; 10T (821+6+10 42)
+delab:  nop                     ; 4T
+        jp      retab           ; 10T
 
         ; measure_symbol and measure_half_symbol
         ;
@@ -255,7 +312,15 @@ mslp:   inc     b               ; 4T Cycle time is 32T
         and     $40             ; 7T
 ms_cmp: jp      z,mslp          ;10T Selfmodified between Z and NZ
         ld      a,(ms_cmp)      ;13T
-        xor     $08             ; 8T Swap jp z and jp nz opcodes
+        xor     $08             ; 7T Swap jp z and jp nz opcodes
         ld      (ms_cmp),a      ;13T
         ld      a,b             ; 4T
         ret                     ;10T
+
+payload_data:   db      0
+payload_base:
+blocknum:       dw      0       ; Payload block number
+loadaddr:       dw      0       ; Load address
+endaddr:        dw      0       ; Last byte of payload + 1
+checksum:       dw      0       ; Space allocated for future checksum
+payload_end_header:
