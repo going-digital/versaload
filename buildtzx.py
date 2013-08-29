@@ -13,7 +13,7 @@ from bitstring import BitArray
 
 tape = TZX()
 
-timeMargin = 1.1
+timeMargin = 1.2
 
 """
 File metadata
@@ -52,17 +52,17 @@ pilotpulse_ROM_min = 1772
 pilottone_header_ROM_min = 4024
 pilottone_data_ROM_min = 2331
 
-loaderblock1.bitpulse0(bitpulse0_ROM_min*timeMargin)
-loaderblock1.bitpulse1(bitpulse1_ROM_min*timeMargin)
-loaderblock1.pilotpulse(pilotpulse_ROM_min*timeMargin)
+#loaderblock1.bitpulse0(bitpulse0_ROM_min*timeMargin)
+#loaderblock1.bitpulse1(bitpulse1_ROM_min*timeMargin)
+#loaderblock1.pilotpulse(pilotpulse_ROM_min*timeMargin)
 loaderblock1.pilottone(pilottone_header_ROM_min*timeMargin)
 loaderblock1.pause(0)
 tape.add_block(loaderblock1)
 
 loaderblock2 = Blk_TSDB(data=loaderdata.get())
-loaderblock2.bitpulse0(bitpulse0_ROM_min*timeMargin)
-loaderblock2.bitpulse1(bitpulse1_ROM_min*timeMargin)
-loaderblock2.pilotpulse(pilotpulse_ROM_min*timeMargin)
+#loaderblock2.bitpulse0(bitpulse0_ROM_min*timeMargin)
+#loaderblock2.bitpulse1(bitpulse1_ROM_min*timeMargin)
+#loaderblock2.pilotpulse(pilotpulse_ROM_min*timeMargin)
 loaderblock2.pilottone(pilottone_data_ROM_min*timeMargin)
 loaderblock2.pause(0)
 tape.add_block(loaderblock2)
