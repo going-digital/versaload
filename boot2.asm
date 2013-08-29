@@ -151,7 +151,8 @@ selfmodified    equ     0       ; Dummy value placeholder for selfmodified code
 
 ; Set up to load payload
         ; Edge + 186T
-        ld      hl,payload_base         ; 10T
+        ;ld      hl,payload_base         ; 10T
+        ld      hl,$4000 ; Debug
         ld      bc,payload_end_header   ; 10T
         ld      d,$01                   ; 7T
         xor     a                       ; 4T
@@ -219,11 +220,11 @@ readdataend:
         ; Once BC=HL, the block is over.
         ld      e,a                     ; 4T
         ld      a,h                     ; 4T
-sm10:   cp      selfmodified            ; 7T
+smc10:  cp      selfmodified            ; 7T
         ld      a,e                     ; 4T
         jp      nz,readdata_1           ; 10T Edge+A+26T (add 32T)
         ld      a,l                     ; 4T
-        cp      c                       ; 4T
+smc11:  cp      selfmodified            ; 7T
         ld      a,e                     ; 4T
         jp      nz,readdata_1           ; 10T Edge+A+48T (add 32T)
         ; Data is complete
@@ -232,16 +233,28 @@ sm10:   cp      selfmodified            ; 7T
         ld      a,e                     ; 7T
         jp      nz,sync_2               ; 10T Edge+A+82T (add 64T)
 
+end_h   equ     smc10+1
+end_l   equ     smc11+1
+
         ; Payload header loaded:
         ; Set up load and end address
         ; TODO: Handle block number
         ; TODO: Handle checksum
 
-        ld      hl,(loadaddr)           ; 16T 
-        ld      bc,endaddr              ; 20T
-        inc     a                       ; 4T
+        ; Magenta boarder: Got block header
+        ld      a,border_magenta        ;  7T
+        out     ($fe),a                 ; 11T Edge+33T
+
+        ld      hl,(loadaddr)           ; 16T
+        ld      bc,(endaddr)            ; 20T
+        ld      a,b                     ; 4T
+        ld      (end_h),a               ; 13T
+        ld      a,c                     ; 4T
+        ld      (end_l),a               ; 13T
+        ld      a,$01                   ; 7T
         ld      (payload_data),a        ; 13T Edge+A+135T
-        add     a,4                     ; 7T
+        ld      a,$04                   ; 7T
+        add     a,e                     ; 4T
         jp      readdata                ; Edge+A+142T (add 128T)
 
         ; For debugging

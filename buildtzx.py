@@ -96,8 +96,9 @@ checkSum = 0x0000 # Placeholder for now
 # Build payload block
 # See https://github.com/going-digital/versaload/wiki/Payload
 #
-data = bitstring.pack('<4H',blockNumber,loadAddress,endAddress,checkSum)
-data.append(BitArray(bytes=rawdata))
+#data = bitstring.pack('<4H',blockNumber,loadAddress,endAddress,checkSum)
+#data.append(BitArray(bytes=rawdata))
+data = BitArray(bytes=rawdata)
 
 # Modulate datastream
 #
