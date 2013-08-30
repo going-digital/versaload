@@ -7,10 +7,6 @@
 
         org loadbase
 
-        ; Debug: Black border indicates boot2 is running
-        ld      a,border_black          ; 7T
-        out     ($fe),a                 ; 11T
-
         ; Sync:
         ;
         ; Look for a specific 32 step data pattern
@@ -28,7 +24,6 @@ sync_loop:
         ccf                             ; 4T
         rl      e                       ; 8T
         rl      d                       ; 8T
-;        adc     hl,hl                   ; 15T faster option?
         rl      l                       ; 8T
         rl      h                       ; 8T
         ld      a,sync_train_1          ; 7T
@@ -49,11 +44,6 @@ sync_loop:
         jr      nz,sync_loop            ; 12T/7T exit: 144T
         ; Sync has been received, 139T after edge so far
         ; Edge+139T
-
-        ; Debug: Blue border indicates synchronisation was successful
-        ld      a,border_blue           ; 7T
-        out     ($fe),a                 ; 11T
-
         ; Edge+157T
 
         ; Calibrate:
@@ -84,10 +74,6 @@ calibrate:
         call    measure_symbol
         ld      e,a                     ; 4T
         add     hl,de                   ; 11T Edge+15T
-
-        ; Debug: Blue border indicates calibration is complete
-        ld      a,border_red            ;  7T
-        out     ($fe),a                 ; 11T Edge+33T
 
         ; HL now contains the duration of four 8 period delays.
         ; Multiply by 8:
@@ -124,7 +110,6 @@ calibrate:
         ld      (thres_8_5),a           ; 13T Edge+186T
 
         ; Edge + 186T
-        ;jp      alert
 
         ; Readdata:
         ;
@@ -246,10 +231,6 @@ end_l   equ     smc11+1
         ; TODO: Handle block number
         ; TODO: Handle checksum
 
-        ; Magenta boarder: Got block header
-        ld      a,border_magenta        ;  7T
-        out     ($fe),a                 ; 11T Edge+33T
-
         ld      hl,(loadaddr)           ; 16T
         ld      bc,(endaddr)            ; 20T
         ld      a,b                     ; 4T
@@ -329,15 +310,13 @@ mslp:   inc     b               ; 4T Cycle time is 32T
         in      a,($fe)         ;11T
         and     $40             ; 7T
 ms_cmp: jp      z,mslp          ;10T Selfmodified between Z and NZ
+        ld      a,border_green  ; 7T
+        out     ($fe),a         ;11T
         ld      a,(ms_cmp)      ;13T
         xor     $08             ; 7T Swap jp z and jp nz opcodes
         ld      (ms_cmp),a      ;13T
-
-        ld      a,$0a
-        out     ($fe),a
-        ld      a,$08
-        out     ($fe),a
-
+        ld      a,border_black  ; 7T
+        out     ($fe),a         ;11T
         ld      a,b             ; 4T
         ret                     ;10T
 

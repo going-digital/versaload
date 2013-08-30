@@ -35,7 +35,7 @@ tape.add_block(infoblock)
 Loader
 """
 loaderprog = open("boot1.bin","rb").read()
-loaderheader = ZX_FileHdr(SPEC_FILE_PROG, 'Versaload', 0, 1, 0)
+loaderheader = ZX_FileHdr(SPEC_FILE_PROG, '\x16\x0b\x0cLoading', 0, 1, 0)
 loaderdata = ZX_FileData(loaderprog)
 loaderheader.setdatalen(loaderdata.datalen())
 loaderblock1 = Blk_TSDB(data=loaderheader.get())
@@ -72,7 +72,7 @@ Payload setup
 """
 # Sync pattern to synchronise loader with stream
 # Starts at 5.42110s into audio
-versaHeader = BitArray('10*0xcc,2*0xf0c,4*0xc3c,2*0xf0c')
+versaHeader = BitArray('1*0xcc,2*0xf0c,4*0xc3c,2*0xf0c')
 
 # Calibration - correct for speed of tape playback
 # 4 cycles of 880us
@@ -148,40 +148,91 @@ def addPayload(loadAddress, rawdata, datamod):
                 else: # data[0:4] must be '0b1111'
                     datamod.append(symbol1111)
                     data=data[4:]
+    return
+
+def optimiseScr(data):
+    # Flips INK/PAPER to maximise the amount of paper
+    # This makes the interlace-loaded screen look more accurate earlier.
+    dataBits = BitArray(bytes=data)
+    for block in range(0,3):
+        addrAttr = 0x1800 + 0x100 * block
+        addrPixel = 0x0800 * block
+        for char in range(0,256):
+            addrAttr2 = 8*(addrAttr + char)
+            addrPixel2 = 8*(addrPixel + char)
+            pixelData = dataBits[addrPixel2:addrPixel2+8]
+            pixelData.append(dataBits[addrPixel2+0x0800:addrPixel2+0x0808])
+            pixelData.append(dataBits[addrPixel2+0x1000:addrPixel2+0x1008])
+            pixelData.append(dataBits[addrPixel2+0x1800:addrPixel2+0x1808])
+            pixelData.append(dataBits[addrPixel2+0x2000:addrPixel2+0x2008])
+            pixelData.append(dataBits[addrPixel2+0x2800:addrPixel2+0x2808])
+            pixelData.append(dataBits[addrPixel2+0x3000:addrPixel2+0x3008])
+            pixelData.append(dataBits[addrPixel2+0x3800:addrPixel2+0x3808])
+            if pixelData.count(1) > 32:
+                # More INK than PAPER in this square
+
+                # Flip pixels
+                pixelData = ~pixelData
+                dataBits[addrPixel2:addrPixel2+8]=pixelData[0:8]
+                dataBits[addrPixel2+0x0800:addrPixel2+0x0808]=pixelData[8:16]
+                dataBits[addrPixel2+0x1000:addrPixel2+0x1008]=pixelData[16:24]
+                dataBits[addrPixel2+0x1800:addrPixel2+0x1808]=pixelData[24:32]
+                dataBits[addrPixel2+0x2000:addrPixel2+0x2008]=pixelData[32:40]
+                dataBits[addrPixel2+0x2800:addrPixel2+0x2808]=pixelData[40:48]
+                dataBits[addrPixel2+0x3000:addrPixel2+0x3008]=pixelData[48:56]
+                dataBits[addrPixel2+0x3800:addrPixel2+0x3808]=pixelData[56:64]
+
+                # Flip attributes
+                attribute = dataBits[addrAttr2:addrAttr2+8]
+                dataBits[addrAttr2:addrAttr2+8]=[
+                    attribute[0],attribute[1],
+                    attribute[5],attribute[6],attribute[7],
+                    attribute[2],attribute[3],attribute[4]
+                    ]
+    data = dataBits.tobytes()
+    return data
+
+# Wait for BASIC to execute
+datamod.append(BitArray('20*0xc'))
+
+# Wait for loader to clear screen
+datamod.append(BitArray('240*0xc'))
 
 # Interlaced screen loading
 screenData = open("test.scr","rb").read()
+screenData = optimiseScr(screenData)    # Maximise PAPER, minimise INK
 addPayload(0x5800, screenData[0x1800:0x1c00], datamod) # Attributes
-addPayload(0x4000, screenData[0x0000:0x0100], datamod) # Row 0
-addPayload(0x4800, screenData[0x0800:0x0900], datamod)
-addPayload(0x5000, screenData[0x1000:0x1100], datamod)
-addPayload(0x4400, screenData[0x0400:0x0500], datamod) # Row 4
-addPayload(0x4c00, screenData[0x0c00:0x0d00], datamod)
-addPayload(0x5400, screenData[0x1400:0x1500], datamod)
-addPayload(0x4200, screenData[0x0200:0x0300], datamod) # Row 2
-addPayload(0x4a00, screenData[0x0a00:0x0b00], datamod)
-addPayload(0x5200, screenData[0x1200:0x1300], datamod)
-addPayload(0x4600, screenData[0x0600:0x0700], datamod) # Row 6
-addPayload(0x4e00, screenData[0x0e00:0x0f00], datamod)
-addPayload(0x5600, screenData[0x1600:0x1700], datamod)
-addPayload(0x4100, screenData[0x0100:0x0200], datamod) # Row 1
-addPayload(0x4900, screenData[0x0900:0x0a00], datamod)
-addPayload(0x5100, screenData[0x1100:0x1200], datamod)
-addPayload(0x4500, screenData[0x0500:0x0600], datamod) # Row 5
-addPayload(0x4d00, screenData[0x0d00:0x0e00], datamod)
-addPayload(0x5500, screenData[0x1500:0x1600], datamod)
 addPayload(0x4300, screenData[0x0300:0x0400], datamod) # Row 3
 addPayload(0x4b00, screenData[0x0b00:0x0c00], datamod)
 addPayload(0x5300, screenData[0x1300:0x1400], datamod)
+addPayload(0x4500, screenData[0x0500:0x0600], datamod) # Row 5
+addPayload(0x4d00, screenData[0x0d00:0x0e00], datamod)
+addPayload(0x5500, screenData[0x1500:0x1600], datamod)
+addPayload(0x4100, screenData[0x0100:0x0200], datamod) # Row 1
+addPayload(0x4900, screenData[0x0900:0x0a00], datamod)
+addPayload(0x5100, screenData[0x1100:0x1200], datamod)
 addPayload(0x4700, screenData[0x0700:0x0800], datamod) # Row 7
 addPayload(0x4f00, screenData[0x0f00:0x1000], datamod)
 addPayload(0x5700, screenData[0x1700:0x1800], datamod)
+addPayload(0x4200, screenData[0x0200:0x0300], datamod) # Row 2
+addPayload(0x4a00, screenData[0x0a00:0x0b00], datamod)
+addPayload(0x5200, screenData[0x1200:0x1300], datamod)
+addPayload(0x4400, screenData[0x0400:0x0500], datamod) # Row 4
+addPayload(0x4c00, screenData[0x0c00:0x0d00], datamod)
+addPayload(0x5400, screenData[0x1400:0x1500], datamod)
+addPayload(0x4000, screenData[0x0000:0x0100], datamod) # Row 0
+addPayload(0x4800, screenData[0x0800:0x0900], datamod)
+addPayload(0x5000, screenData[0x1000:0x1100], datamod)
+addPayload(0x4600, screenData[0x0600:0x0700], datamod) # Row 6
+addPayload(0x4e00, screenData[0x0e00:0x0f00], datamod)
+addPayload(0x5600, screenData[0x1600:0x1700], datamod)
 
 # Add final tape state (so last symbol can be decoded)
 datamod.append('0b1')
 
 payloadblock = Blk_DRB(sampledata = datamod.tobytes())
 payloadblock.tstatespersample(110*3.5)
+payloadblock.pause(0)
 
 tape.add_block(payloadblock)
 
