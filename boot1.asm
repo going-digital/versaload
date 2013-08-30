@@ -1,6 +1,6 @@
         include "tokens.inc"
         include "globals.inc"
-
+        include "romhooks.inc"
 
 ; BASIC bootstrap to machine code
 ;
@@ -20,10 +20,24 @@
         db      $39             ;   preserves DE.
         db      $96
         ld      sp,stackptr     ; Move stack to a better place
+
+
         ld      hl,reloc_start
         push    de              ; Set execution address of loader
         ld      bc,reloc_end - reloc_start
         ldir                    ; Relocate loader
+
+        ;
+        ; Clear screen to alternating INK/PAPER pattern
+        ;
+        ; This gives a fade-in style effect as the screen loads
+        ;
+        ld      hl,$4000
+        ld      de,$4001
+        ld      bc,$1aff
+        ld      (hl),l
+        ldir
+
         ret                     ; Jump to relocated loader
 
 reloc_start:
