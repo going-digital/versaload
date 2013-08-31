@@ -91,25 +91,14 @@ calibrate:
         add     hl,hl                   ; 4T H: 8 periods Edge+93T
         ; Now to calculate the thresholds
         ; Done in Gray code order for fastest calculation speed.
-        ld      a,b                     ; 4T
-        add     a,c                     ; 4T
-        add     a,d                     ; 4T
-        ld      (thres_3_5),a           ; 13T
-        sub     c                       ; 4T
-        ld      (thres_2_5),a           ; 13T
-        add     a,e                     ; 4T
-        ld      (thres_6_5),a           ; 13T
-        sub     d                       ; 4T
-        ld      (thres_4_5),a           ; 13T
-        add     a,c                     ; 4T
-        ld      (thres_5_5),a           ; 13T
-        add     a,d                     ; 4T
-        ld      (thres_7_5),a           ; 13T
-        ld      a,h                     ; 4T
-        add     a,b                     ; 4T
-        ld      (thres_8_5),a           ; 13T Edge+186T
 
-        ; Edge + 186T
+        ld      a,c                     ; 4T
+        add     a,d                     ; 4T
+        ld      (thres_3),a             ; 13T
+        add     a,e                     ; 4T
+        ld      (thres_7),a             ; 13T
+        sub     d                       ; 4T
+        ld      (thres_5),a             ; 13T Edge+148T
 
         ; Readdata:
         ;
@@ -117,14 +106,10 @@ calibrate:
         ; decoding engine to extract real data.
         ;
         ; Tree Length Encoding
-        ;    / 220us  00
-        ;   /\ 330us  01
-        ;  / / 440us  100
-        ; / /\ 550us  101
-        ; \/ / 660us  1100
-        ;  \/\ 770us  1101
-        ;   \/ 880us  1110
-        ;    \ 990us  1111
+        ;  / 220us  00
+        ; /\ 440us  01
+        ; \/ 660us  10
+        ;  \ 880us  11
 
         ; This part is unrolled for speed. The entire loop from edge to edge
         ; must complete within 700T otherwise the next pulse measurement may
@@ -135,7 +120,7 @@ selfmodified    equ     0       ; Dummy value placeholder for selfmodified code
 ; TODO: Recalculate timings through this section
 
 ; Set up to load payload
-        ; Edge + 186T
+        ; Edge + 148T
         ld      hl,payload_base         ; 10T
         ;ld      hl,$4000 ; Debug
         ld      bc,payload_end_header   ; 10T
@@ -154,11 +139,11 @@ readdata_1:
         inc     a                       ; 4T
 readdata:
         call    measure_symbol          ; 17T
-smc01:  cp      selfmodified            ; 7T    thres_3_5 stored here
+smc01:  cp      selfmodified            ; 7T    thres_5 stored here
         ccf                             ; 4T
         jp      c,bits_1_               ; 10T Edge+21T
         call    addbit                  ; 61T
-smc02:  cp      selfmodified            ; 7T    thres_2_5 stored here
+smc02:  cp      selfmodified            ; 7T    thres_3 stored here
         ccf                             ; 4T
         call    addbit                  ; 61T
         ld      a,+(171+16)/32          ; 7T
@@ -166,44 +151,14 @@ smc02:  cp      selfmodified            ; 7T    thres_2_5 stored here
 
         ; Called at Edge+21T
 bits_1_:call    addbit                  ; 61T
-smc03:  cp      selfmodified            ; 7T    thres_5_5 stored here
-        ccf                             ; 4T
-        jp      c,bits_11_              ; 10T Edge+103T
-        call    addbit                  ; 61T
-smc04:  cp      selfmodified            ; 7T    thres_4_5 stored here
+smc03:  cp      selfmodified            ; 7T    thres_7 stored here
         ccf                             ; 4T
         call    addbit                  ; 61T
-        ld      a,+(253+16)/32          ; 7T
-        jp      readdataend             ; 10T Edge+253T
+        ld      a,+(161+16)/32          ; 7T
 
-        ; Called at Edge+103T
-bits_11_:
-        call    addbit                  ; 61T
-smc06:  cp      selfmodified            ; 7T    thres_7_5 stored here
-        ccf                             ; 4T
-        jp      c,bits_111_             ; 10T Edge+185T
-        call    addbit                  ; 61T
-smc07:  cp      selfmodified            ; 7T    thres_6_5 stored here
-        ccf                             ; 4T
-        call    addbit                  ; 61T
-ret08:  ld      a,+(335+16)/32          ; 7T
-        jp      readdataend             ; 10T Edge+335T
-
-        ; Called at Edge+185T
-bits_111_:
-        call    addbit                  ; 61T
-smc08:  cp      selfmodified            ; 7T    thres_8_5 stored here
-        ccf                             ; 4T
-        call    addbit                  ; 61T
-        ld      a,+(325+16)/32          ; 7T Edge+325T
-
-thres_2_5       equ     smc02+1
-thres_3_5       equ     smc01+1
-thres_4_5       equ     smc04+1
-thres_5_5       equ     smc03+1
-thres_6_5       equ     smc07+1
-thres_7_5       equ     smc06+1
-thres_8_5       equ     smc08+1
+thres_3         equ     smc02+1
+thres_5         equ     smc01+1
+thres_7         equ     smc03+1
 
 readdataend:
         ; Up to 4 bits can be added for each symbol.

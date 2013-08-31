@@ -72,11 +72,15 @@ Payload setup
 """
 # Sync pattern to synchronise loader with stream
 # Starts at 5.42110s into audio
-versaHeader = BitArray('1*0xcc,2*0xf0c,4*0xc3c,2*0xf0c')
+versaHeader = BitArray('1*0b1010,2*0b110010,4*0b100110,2*0b110010')
 
 # Calibration - correct for speed of tape playback
 # 4 cycles of 880us
-versaHeader.append(BitArray('4*0xff00'))
+versaHeader.append(BitArray('4*0b11110000'))
+symbol00 = BitArray('1*0b1,1*0b0')
+symbol01 = BitArray('2*0b1,2*0b0')
+symbol10 = BitArray('3*0b1,3*0b0')
+symbol11 = BitArray('4*0b1,4*0b0')
 
 blockNumber = 0x0000
 
@@ -103,18 +107,9 @@ def addPayload(loadAddress, rawdata, datamod):
 
         # Modulate datastream
         #
-        # Encodes bits with the Versaload 8 symbol method
+        # Encodes bits with the Versaload 4 symbol method
         # Some padding may be necessary to encode the bit sequence. '0' is always used,
         # as this produces the shortest output.
-
-        symbol00    = BitArray('2*0b1,2*0b0')
-        symbol01    = BitArray('3*0b1,3*0b0')
-        symbol100   = BitArray('4*0b1,4*0b0')
-        symbol101   = BitArray('5*0b1,5*0b0')
-        symbol1100  = BitArray('6*0b1,6*0b0')
-        symbol1101  = BitArray('7*0b1,7*0b0')
-        symbol1110  = BitArray('8*0b1,8*0b0')
-        symbol1111  = BitArray('9*0b1,9*0b0')
 
         datamod.append(versaHeader)
 
@@ -128,32 +123,12 @@ def addPayload(loadAddress, rawdata, datamod):
             elif data[0:2]=='0b01':
                 datamod.append(symbol01)
                 data=data[2:]
-            else:
-                # 3 bit sequences
-                if data.length < 3:
-                    data.append('0b0')
-                if data[0:3]=='0b100':
-                    datamod.append(symbol100)
-                    data=data[3:]
-                elif data[0:3]=='0b101':
-                    datamod.append(symbol101)
-                    data=data[3:]
-                else:
-                    # 4 bit sequences
-                    if data.length < 4:
-                        data.append('0b0')
-                    if data[0:4]=='0b1100':
-                        datamod.append(symbol1100)
-                        data=data[4:]
-                    elif data[0:4]=='0b1101':
-                        datamod.append(symbol1101)
-                        data=data[4:]
-                    elif data[0:4]=='0b1110':
-                        datamod.append(symbol1110)
-                        data=data[4:]
-                    else: # data[0:4] must be '0b1111'
-                        datamod.append(symbol1111)
-                        data=data[4:]
+            elif data[0:2]=='0b10':
+                datamod.append(symbol10)
+                data=data[2:]
+            else: # data[0:2] must be '0b1111'
+                datamod.append(symbol11)
+                data=data[2:]
     return
 
 def optimiseScr(data):
@@ -199,14 +174,14 @@ def optimiseScr(data):
     return data
 
 # Wait for BASIC to execute
-datamod.append(BitArray('20*0xc'))
+datamod.append(BitArray('40*0b10'))
 
 # Wait for loader to clear screen
-datamod.append(BitArray('240*0xc'))
+datamod.append(BitArray('480*0b10'))
 
-execAddr = 0xbd0d
-borderFlashAddr = 0xbd41
-borderMainAddr = 0xbd4d
+execAddr = 0xbccd
+borderFlashAddr = 0xbd01
+borderMainAddr = 0xbd0d
 
 def addExec(addr):
     addPayload(execAddr,pack("<BH",0xc3,addr), datamod)
