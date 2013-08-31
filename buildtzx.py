@@ -38,7 +38,7 @@ loaderprog = open("boot1.bin","rb").read()
 loaderheader = ZX_FileHdr(SPEC_FILE_PROG, '\x16\x0b\x0cLoading', 0, 1, 0)
 loaderdata = ZX_FileData(loaderprog)
 loaderheader.setdatalen(loaderdata.datalen())
-loaderblock1 = Blk_TSDB(data=loaderheader.get())
+loaderblock1 = Blk_SSDB(data=loaderheader.get())
 #
 # Set to absolute fastest settings then back off by 10%
 # This achieves 2176 baud instead of 1535 baud with the stock ROM loader.
@@ -52,18 +52,12 @@ pilotpulse_ROM_min = 1772
 pilottone_header_ROM_min = 4024
 pilottone_data_ROM_min = 2331
 
-#loaderblock1.bitpulse0(bitpulse0_ROM_min*timeMargin)
-#loaderblock1.bitpulse1(bitpulse1_ROM_min*timeMargin)
-#loaderblock1.pilotpulse(pilotpulse_ROM_min*timeMargin)
-loaderblock1.pilottone(pilottone_header_ROM_min*timeMargin)
-loaderblock1.pause(0)
+#loaderblock1.pilottone(pilottone_header_ROM_min*timeMargin)
+#loaderblock1.pause(0)
 tape.add_block(loaderblock1)
 
-loaderblock2 = Blk_TSDB(data=loaderdata.get())
-#loaderblock2.bitpulse0(bitpulse0_ROM_min*timeMargin)
-#loaderblock2.bitpulse1(bitpulse1_ROM_min*timeMargin)
-#loaderblock2.pilotpulse(pilotpulse_ROM_min*timeMargin)
-loaderblock2.pilottone(pilottone_data_ROM_min*timeMargin)
+loaderblock2 = Blk_SSDB(data=loaderdata.get())
+#loaderblock2.pilottone(pilottone_data_ROM_min*timeMargin)
 loaderblock2.pause(0)
 tape.add_block(loaderblock2)
 
