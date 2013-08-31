@@ -221,7 +221,7 @@ smc11:  cp      selfmodified            ; 7T
         ld      a,(payload_data)        ; 13T
         and     a                       ; 4T
         ld      a,e                     ; 7T
-        jp      nz,sync_2               ; 10T Edge+A+82T (add 64T)
+        jp      nz,payload_complete     ; 10T Edge+A+82T (add 64T)
 
 end_h   equ     smc10+1
 end_l   equ     smc11+1
@@ -243,10 +243,19 @@ end_l   equ     smc11+1
         add     a,e                     ; 4T
         jp      readdata                ; Edge+A+142T (add 128T)
 
+payload_complete:
+        nop                             ; 4+4+4T          Loader can insert a CALL or JP here
+        nop                             ; or 17T for CALL to execute external routines
+        nop
+        xor     a                       ; 4T  0 is opcode for NOP
+        ld      (payload_complete),a    ; 13T
+        ld      (payload_complete+1),a  ; 13T
+        ld      (payload_complete+2),a  ; 13T
+        jp      sync_2                  ; 10T
+PAYLOAD_JUMP equ payload_complete
+
         ; For debugging
         jp      alert
-
-
 
         ; alert
         ;
@@ -258,7 +267,6 @@ alert:  ld      a,$17   ; De Bruijn sequence k=2 n=3
 alertlp:out     ($fe),a
         rlca
         jr      alertlp
-
 
         ; addbit
         ;
@@ -310,15 +318,17 @@ mslp:   inc     b               ; 4T Cycle time is 32T
         in      a,($fe)         ;11T
         and     $40             ; 7T
 ms_cmp: jp      z,mslp          ;10T Selfmodified between Z and NZ
-        ld      a,border_green  ; 7T
+b_fl:   ld      a,border_blue   ; 7T
         out     ($fe),a         ;11T
         ld      a,(ms_cmp)      ;13T
         xor     $08             ; 7T Swap jp z and jp nz opcodes
         ld      (ms_cmp),a      ;13T
-        ld      a,border_black  ; 7T
+b_m:    ld      a,border_white  ; 7T
         out     ($fe),a         ;11T
         ld      a,b             ; 4T
         ret                     ;10T
+BORDER_FLASH equ b_fl+1
+BORDER_MAIN equ b_m+1
 
 payload_data:   db      0
 payload_base:

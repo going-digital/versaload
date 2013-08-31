@@ -86,68 +86,74 @@ Payload blocks
 datamod = BitArray()
 
 def addPayload(loadAddress, rawdata, datamod):
-    # Build payload block
-    # See https://github.com/going-digital/versaload/wiki/Payload
-    #
-    endAddress = loadAddress + len(rawdata)
-    checkSum = 0x0000
-    data = bitstring.pack('<4H',blockNumber,loadAddress,endAddress,checkSum)
-    data.append(BitArray(bytes=rawdata))
-    #data = BitArray(bytes=rawdata)
+    if len(rawdata) > 0x100:
+        # Divide into 0x100 long blocks
+        addPayload(loadAddress, rawdata[0:0x100], datamod)
+        addPayload(loadAddress+0x100, rawdata[0x100:], datamod)
+    else:
+        print "Payload",hex(loadAddress)
+        # Build payload block
+        # See https://github.com/going-digital/versaload/wiki/Payload
+        #
+        endAddress = (loadAddress + len(rawdata)) & 0xffff
+        checkSum = 0x0000
+        data = bitstring.pack('<4H',blockNumber,loadAddress,endAddress,checkSum)
+        data.append(BitArray(bytes=rawdata))
+        #data = BitArray(bytes=rawdata)
 
-    # Modulate datastream
-    #
-    # Encodes bits with the Versaload 8 symbol method
-    # Some padding may be necessary to encode the bit sequence. '0' is always used,
-    # as this produces the shortest output.
+        # Modulate datastream
+        #
+        # Encodes bits with the Versaload 8 symbol method
+        # Some padding may be necessary to encode the bit sequence. '0' is always used,
+        # as this produces the shortest output.
 
-    symbol00    = BitArray('2*0b1,2*0b0')
-    symbol01    = BitArray('3*0b1,3*0b0')
-    symbol100   = BitArray('4*0b1,4*0b0')
-    symbol101   = BitArray('5*0b1,5*0b0')
-    symbol1100  = BitArray('6*0b1,6*0b0')
-    symbol1101  = BitArray('7*0b1,7*0b0')
-    symbol1110  = BitArray('8*0b1,8*0b0')
-    symbol1111  = BitArray('9*0b1,9*0b0')
+        symbol00    = BitArray('2*0b1,2*0b0')
+        symbol01    = BitArray('3*0b1,3*0b0')
+        symbol100   = BitArray('4*0b1,4*0b0')
+        symbol101   = BitArray('5*0b1,5*0b0')
+        symbol1100  = BitArray('6*0b1,6*0b0')
+        symbol1101  = BitArray('7*0b1,7*0b0')
+        symbol1110  = BitArray('8*0b1,8*0b0')
+        symbol1111  = BitArray('9*0b1,9*0b0')
 
-    datamod.append(versaHeader)
+        datamod.append(versaHeader)
 
-    while data.length > 0:
-        # 2 bit sequences
-        if data.length < 2:
-            data.append('0b0')
-        if data[0:2]=='0b00':
-            datamod.append(symbol00)
-            data=data[2:]
-        elif data[0:2]=='0b01':
-            datamod.append(symbol01)
-            data=data[2:]
-        else:
-            # 3 bit sequences
-            if data.length < 3:
+        while data.length > 0:
+            # 2 bit sequences
+            if data.length < 2:
                 data.append('0b0')
-            if data[0:3]=='0b100':
-                datamod.append(symbol100)
-                data=data[3:]
-            elif data[0:3]=='0b101':
-                datamod.append(symbol101)
-                data=data[3:]
+            if data[0:2]=='0b00':
+                datamod.append(symbol00)
+                data=data[2:]
+            elif data[0:2]=='0b01':
+                datamod.append(symbol01)
+                data=data[2:]
             else:
-                # 4 bit sequences
-                if data.length < 4:
+                # 3 bit sequences
+                if data.length < 3:
                     data.append('0b0')
-                if data[0:4]=='0b1100':
-                    datamod.append(symbol1100)
-                    data=data[4:]
-                elif data[0:4]=='0b1101':
-                    datamod.append(symbol1101)
-                    data=data[4:]
-                elif data[0:4]=='0b1110':
-                    datamod.append(symbol1110)
-                    data=data[4:]
-                else: # data[0:4] must be '0b1111'
-                    datamod.append(symbol1111)
-                    data=data[4:]
+                if data[0:3]=='0b100':
+                    datamod.append(symbol100)
+                    data=data[3:]
+                elif data[0:3]=='0b101':
+                    datamod.append(symbol101)
+                    data=data[3:]
+                else:
+                    # 4 bit sequences
+                    if data.length < 4:
+                        data.append('0b0')
+                    if data[0:4]=='0b1100':
+                        datamod.append(symbol1100)
+                        data=data[4:]
+                    elif data[0:4]=='0b1101':
+                        datamod.append(symbol1101)
+                        data=data[4:]
+                    elif data[0:4]=='0b1110':
+                        datamod.append(symbol1110)
+                        data=data[4:]
+                    else: # data[0:4] must be '0b1111'
+                        datamod.append(symbol1111)
+                        data=data[4:]
     return
 
 def optimiseScr(data):
@@ -198,10 +204,25 @@ datamod.append(BitArray('20*0xc'))
 # Wait for loader to clear screen
 datamod.append(BitArray('240*0xc'))
 
+execAddr = 0xbd0d
+borderFlashAddr = 0xbd41
+borderMainAddr = 0xbd4d
+
+def addExec(addr):
+    addPayload(execAddr,pack("<BH",0xc3,addr), datamod)
+def addCall(addr):
+    addPayload(execAddr,pack("<BH",0xcd,addr), datamod)
+def borderFlash(colour):
+    addPayload(borderFlashAddr,pack("<B",0x8+colour), datamod)
+def borderMain(colour):
+    addPayload(borderMainAddr,pack("<B",0x8+colour), datamod)
+
 # Interlaced screen loading
 screenData = open("test.scr","rb").read()
 screenData = optimiseScr(screenData)    # Maximise PAPER, minimise INK
 addPayload(0x5800, screenData[0x1800:0x1c00], datamod) # Attributes
+borderMain(1) # Blue border
+borderFlash(0) # Black flash
 addPayload(0x4300, screenData[0x0300:0x0400], datamod) # Row 3
 addPayload(0x4b00, screenData[0x0b00:0x0c00], datamod)
 addPayload(0x5300, screenData[0x1300:0x1400], datamod)
@@ -226,6 +247,26 @@ addPayload(0x5000, screenData[0x1000:0x1100], datamod)
 addPayload(0x4600, screenData[0x0600:0x0700], datamod) # Row 6
 addPayload(0x4e00, screenData[0x0e00:0x0f00], datamod)
 addPayload(0x5600, screenData[0x1600:0x1700], datamod)
+borderFlash(7) # White flash
+
+def genFixup(src,dest,length,sp,pc):
+    # Z80 version
+    data = pack("<BHBHBHBH3BH",0x01,length,0x11,dest,0x21,src,0x31,sp,0xed,0xb0,0xc3,pc)
+    print ":".join("{:02x}".format(ord(c)) for c in data)
+    return data
+
+# Main code
+mainData = open("test.raw","rb").read()
+addPayload(0x8000, mainData[0x0000:0x3c00], datamod)
+addPayload(0x7c00, mainData[0x3c00:0x4000], datamod)
+addPayload(0xc000, mainData[0x4000:0x8000], datamod)
+addPayload(0x800c, pack("<2B",0,0), datamod) # Patch out wait for keypress
+addPayload(0x7000, genFixup(0x7c00,0xbc00,0x400,0x5fff,0x8000), datamod)
+addExec(0x7000)
+
+# Need to move SP to xx
+# Need to relocate 7E00..8000 to BE00..C000
+# Need to execute at 8000
 
 # Add final tape state (so last symbol can be decoded)
 datamod.append('0b1')
