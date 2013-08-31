@@ -42,6 +42,7 @@ sync_loop:
         cp      e                       ; 4T
         ld      a,+(144+16)/32          ; 7T
         jr      nz,sync_loop            ; 12T/7T exit: 144T
+
         ; Sync has been received, 139T after edge so far
         ; Edge+139T
         ; Edge+157T
@@ -122,7 +123,6 @@ selfmodified    equ     0       ; Dummy value placeholder for selfmodified code
 ; Set up to load payload
         ; Edge + 148T
         ld      hl,payload_base         ; 10T
-        ;ld      hl,$4000 ; Debug
         ld      bc,payload_end_header   ; 10T
         ld      a,b                     ; 4T
         ld      (end_h),a               ; 13T

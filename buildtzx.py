@@ -66,11 +66,16 @@ Payload setup
 """
 # Sync pattern to synchronise loader with stream
 # Starts at 5.42110s into audio
-versaHeader = BitArray('1*0b1010,2*0b110010,4*0b100110,2*0b110010')
+versaHeader = BitArray('1*0b11110000')
+versaHeader.append(BitArray('0b11110000101011110000'))
+versaHeader.append(BitArray('0b10111100001111000010'))
+versaHeader.append(BitArray('0b10101010111100001111'))
+versaHeader.append(BitArray('0b00001111000011110000'))
 
 # Calibration - correct for speed of tape playback
 # 4 cycles of 880us
 versaHeader.append(BitArray('4*0b11110000'))
+
 symbol00 = BitArray('1*0b1,1*0b0')
 symbol01 = BitArray('2*0b1,2*0b0')
 symbol10 = BitArray('3*0b1,3*0b0')
@@ -167,11 +172,13 @@ def optimiseScr(data):
     data = dataBits.tobytes()
     return data
 
+
+datamod.append(BitArray('2000*0b1100'))
 # Wait for BASIC to execute
-datamod.append(BitArray('40*0b10'))
+#datamod.append(BitArray('40*0b10'))
 
 # Wait for loader to clear screen
-datamod.append(BitArray('480*0b10'))
+#datamod.append(BitArray('480*0b10'))
 
 execAddr = 0xbccd
 borderFlashAddr = 0xbd01

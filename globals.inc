@@ -10,23 +10,15 @@
 loadbase        equ     $BC00
 stackptr        equ     $C000
 
-; Sync train is:
-; LLSSLLSS SLLSSLLS SLLSSLLS LLSSLLSS
-;  ___     _
-; |   |___| |_|
-;  _     ___
-; | |___|   |_|
+; Sync train
 ;
-; This should never occur in the data stream, as high/low pairs are not
-; matched.
-;
-sync_train_1    equ     $CC
-sync_train_2    equ     $66
-sync_train_3    equ     $66
-sync_train_4    equ     $CC
+sync_train_1    equ     $c3
+sync_train_2    equ     $3c
+sync_train_3    equ     $00
+sync_train_4    equ     $ff
 
-; Symbols are 220 and 440µs long, so set threshold at geometric mean, 311µs
-sync_threshold  equ     +(544+16)/32   ; 544T = 156us = sqrt(110 * 220)
+; Symbols are 110 and 440µs long, so set threshold at geometric mean, 220µs
+sync_threshold  equ     +(770+16)/32   ; 770T = 220us = sqrt(110 * 440)
 
 ;
 border_black    equ     $08
