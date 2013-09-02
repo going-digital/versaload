@@ -180,9 +180,20 @@ datamod.append(BitArray('2000*0b1100'))
 # Wait for loader to clear screen
 #datamod.append(BitArray('480*0b10'))
 
-execAddr = 0xbccd
-borderFlashAddr = 0xbd01
-borderMainAddr = 0xbd0d
+# Read boot2.asmgl as tuples, 
+labelList = {}
+with open("boot2.asmgl") as labels:
+    for line in labels:
+        (label,dummy,value) = line.split()
+        labelList[label]=int(value[1:-1],16)
+
+execAddr = labelList['PAYLOAD_JUMP']
+borderFlashAddr = labelList['BORDER_FLASH']
+borderMainAddr = labelList['BORDER_MAIN']
+
+print "execAddr",hex(execAddr)
+print "borderFlashAddr",hex(borderFlashAddr)
+print "borderMainAddr",hex(borderMainAddr)
 
 def addExec(addr):
     addPayload(execAddr,pack("<BH",0xc3,addr), datamod)
