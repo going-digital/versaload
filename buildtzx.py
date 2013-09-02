@@ -198,7 +198,7 @@ screenData = open("test.scr","rb").read()
 screenData = optimiseScr(screenData)    # Maximise PAPER, minimise INK
 addPayload(0x5800, screenData[0x1800:0x1c00], datamod) # Attributes
 borderMain(1) # Blue border
-borderFlash(0) # Black flash
+borderFlash(7) # Black flash
 addPayload(0x4300, screenData[0x0300:0x0400], datamod) # Row 3
 addPayload(0x4b00, screenData[0x0b00:0x0c00], datamod)
 addPayload(0x5300, screenData[0x1300:0x1400], datamod)
@@ -223,7 +223,7 @@ addPayload(0x5000, screenData[0x1000:0x1100], datamod)
 addPayload(0x4600, screenData[0x0600:0x0700], datamod) # Row 6
 addPayload(0x4e00, screenData[0x0e00:0x0f00], datamod)
 addPayload(0x5600, screenData[0x1600:0x1700], datamod)
-borderFlash(7) # White flash
+borderFlash(0) # White flash
 
 def genFixup(src,dest,length,sp,pc):
     # Z80 version

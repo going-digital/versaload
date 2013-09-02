@@ -28,16 +28,21 @@
         ldir                    ; Relocate loader
 
         ;
-        ; Clear screen to alternating INK/PAPER pattern
+        ; Clear screen, leaving 'Loading' on-screen
         ;
-        ; This gives a fade-in style effect as the screen loads
-        ;
-        ld      hl,$4000
-        ld      de,$4001
-        ld      bc,$1aff
+        ld      hl,$4000        ; Clear top third of screen
+        ld      de,$4001        ; (the Program: part)
+        ld      bc,$0800
         ld      (hl),l
         ldir
-
+        ld      h,$50           ; Clear bottom third of screen
+        ld      d,h             ; (The Tape Loader bar on 128K Spectrum)
+        ld      b,$08
+        ld      (hl),l
+        ldir
+        ld      (hl),$38        ; Clear attributes to INK 0 PAPER 7
+        ld      bc,$2ff         ; Blanking out the Tape Loader bar
+        ldir
         ret                     ; Jump to relocated loader
 
 reloc_start:
