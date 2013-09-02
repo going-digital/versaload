@@ -263,11 +263,26 @@ delab:  nop                     ; 4T
         ;
 measure_symbol:
         call    measure_half_symbol ; 17T
-        ; This is a good place to put a short piece of code with a known
-        ; execution time. There is around 220µs of time available here,
-        ; executed once per incoming symbol.
-        ; 'A' must be updated with compensation for the time lost.
+
+        ; Glitch ignore delay, because A already contains the half-symbol
+        ; timing, and won't trigger the glitch delay in measure_half_symbol
+        ld      b,1 ; 7T
+        add     a,b     ; 4T
+mslp2:  nop             ; 4T     \
+        nop             ; 4T      \
+        nop             ; 4T       | 32T loop + 6T overhead
+        and     0       ; 7T      /
+        djnz    mslp2   ; 13T/8T /
+
 measure_half_symbol:
+        ; Glitch ignore delay for when A < sync_delay
+        ; This loop is 32T long, matching the sample loop below
+        and     0               ; 7T
+        nop                     ; 4T
+        inc     a               ; 4T 
+        cp      glitch_delay    ; 7T loop until a > sync_delay
+        jp      pe,measure_half_symbol ; 10T
+
         ld      b,a             ; 4T
 mslp:   inc     b               ; 4T Cycle time is 32T
         in      a,($fe)         ;11T

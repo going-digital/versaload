@@ -19,6 +19,7 @@ sync_train_4    equ     $ff
 
 ; Symbols are 110 and 440µs long, so set threshold at geometric mean, 220µs
 sync_threshold  equ     +(770+16)/32   ; 770T = 220us = sqrt(110 * 440)
+glitch_delay    equ     +(308+16)/32   ; 308T = 88us = 110us - 20%
 
 ; Border values for OUT($fe)
 border_black    equ     $08
