@@ -180,7 +180,7 @@ datamod.append(BitArray('2000*0b1100'))
 # Wait for loader to clear screen
 #datamod.append(BitArray('480*0b10'))
 
-# Read boot2.asmgl as tuples, 
+# Extract important addresses from Pasmo output
 labelList = {}
 with open("boot2.asmgl") as labels:
     for line in labels:
@@ -190,10 +190,6 @@ with open("boot2.asmgl") as labels:
 execAddr = labelList['PAYLOAD_JUMP']
 borderFlashAddr = labelList['BORDER_FLASH']
 borderMainAddr = labelList['BORDER_MAIN']
-
-print "execAddr",hex(execAddr)
-print "borderFlashAddr",hex(borderFlashAddr)
-print "borderMainAddr",hex(borderMainAddr)
 
 def addExec(addr):
     addPayload(execAddr,pack("<BH",0xc3,addr), datamod)
