@@ -83,7 +83,6 @@ calibrate:
         add     hl,hl                   ; 4T H: 8 periods [edge+203T]
         ; Now to calculate the thresholds
         ; Done in Gray code order for fastest calculation speed.
-
         ld      a,c                     ; 4T [edge+207T]
         add     a,d                     ; 4T [edge+211T]
         ld      (thres_3),a             ; 13T [edge+224T]
@@ -123,7 +122,7 @@ selfmodified    equ     0       ; Dummy value placeholder for selfmodified code
         ld      (payload_data),a        ; 13T [edge+335T]
         ld      a,+(342+16)/32          ; 7T [edge+342T]
 readdata:
-        call    measure_symbol          ; [edge+367/?/?T] 17T [edge+111T]
+        call    measure_symbol          ; 17T [edge+111T]
 smc01:  cp      selfmodified            ; 7T    thres_5 stored here [edge+119T]
         ccf                             ; 4T [edge+123T]
         jp      c,bits_1_               ; 10T [edge+133T]
