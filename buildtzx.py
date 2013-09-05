@@ -232,24 +232,41 @@ addPayload(0x4e00, screenData[0x0e00:0x0f00], datamod)
 addPayload(0x5600, screenData[0x1600:0x1700], datamod)
 borderFlash(0) # White flash
 
-def genFixup(src,dest,length,sp,pc):
+def genFixup(src,dest,length,spVal,pc):
     # Z80 version
-    data = pack("<BHBHBHBH3BH",0x01,length,0x11,dest,0x21,src,0x31,sp,0xed,0xb0,0xc3,pc)
-    print ":".join("{:02x}".format(ord(c)) for c in data)
+    """
+        01 nn nn    ld      bc,length
+        11 nn nn    ld      de,dest
+        21 nn nn    ld      hl,src
+        31 nn nn    ld      sp,spVal
+        ed b0       ldir
+        c3 nn nn    jp      pc
+    """
+    data = pack("<BHBHBHBH3BH",0x01,length,0x11,dest,0x21,src,0x31,spVal,0xed,0xb0,0xc3,pc)
+    #print ":".join("{:02x}".format(ord(c)) for c in data)
     return data
 
 # Main code
 mainData = open("test.raw","rb").read()
+
+# Load 0x8000-0xbbff into final location
 addPayload(0x8000, mainData[0x0000:0x3c00], datamod)
+
+# Load 0xbc00-0xbfff block to 0x7c00 to avoid overwriting loader
 addPayload(0x7c00, mainData[0x3c00:0x4000], datamod)
+
+# Load 0xc000-0xffff into final location
 addPayload(0xc000, mainData[0x4000:0x8000], datamod)
-addPayload(0x800c, pack("<2B",0,0), datamod) # Patch out wait for keypress
+
+# Patch out wait for keypress at 0x800c
+addPayload(0x800c, pack("<2B",0,0), datamod)
+
+# Load relocate/execute code at 0x7000
 addPayload(0x7000, genFixup(0x7c00,0xbc00,0x400,0x5fff,0x8000), datamod)
+
+# Execute relocate code, then game
 addExec(0x7000)
 
-# Need to move SP to xx
-# Need to relocate 7E00..8000 to BE00..C000
-# Need to execute at 8000
 
 # Add final tape state (so last symbol can be decoded)
 datamod.append('0b1')
