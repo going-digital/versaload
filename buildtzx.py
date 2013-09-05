@@ -172,7 +172,6 @@ def optimiseScr(data):
     data = dataBits.tobytes()
     return data
 
-
 datamod.append(BitArray('2000*0b1100'))
 # Wait for BASIC to execute
 #datamod.append(BitArray('40*0b10'))
@@ -197,22 +196,44 @@ borderMainAddr = labelList['BORDER_MAIN']
 printRoutine = labelList['PRINT_ROUTINE']
 printParam = labelList['PRINT_PARAM']
 
+def hexDump(str):
+    print(":".join("{:02x}".format(ord(c)) for c in str))
 def addExec(addr):
+    # Jump to location, exiting loader
     addPayload(execAddr,pack("<BH",0xc3,addr), datamod)
 def addCall(addr):
+    # Call subroutine at location
     addPayload(execAddr,pack("<BH",0xcd,addr), datamod)
 def borderFlash(colour):
+    # Change colour of border flash
     addPayload(borderFlashAddr,pack("<B",0x8+colour), datamod)
 def borderMain(colour):
+    # Change main border colour
     addPayload(borderMainAddr,pack("<B",0x8+colour), datamod)
 def printText(x,y,text):
+    # Print message to screen.
+    # Restricted to character square positions, and char codes 32-127
+    # Simple routine that does not support wrapping, colour or control codes
     payload = pack("<2H",0x3d00,0x4000+(y//8)*0x800+(y%8)*0x20+x)
     payload = payload + text
     payload = payload + pack("<B",0)
-    print(":".join("{:02x}".format(ord(c)) for c in payload))
     addPayload(printParam,payload,datamod)
     addCall(printRoutine)
     datamod.append(BitArray('0b1100')*len(text))
+def genFixup(src,dest,length,spVal,pc):
+    # Relocate memory block and execute payload
+    # Z80 version
+    """
+        01 nn nn    ld      bc,length
+        11 nn nn    ld      de,dest
+        21 nn nn    ld      hl,src
+        31 nn nn    ld      sp,spVal
+        ed b0       ldir
+        c3 nn nn    jp      pc
+    """
+    data = pack("<BHBHBHBH3BH",0x01,length,0x11,dest,0x21,src,0x31,spVal,0xed,0xb0,0xc3,pc)
+    #print ":".join("{:02x}".format(ord(c)) for c in data)
+    return data
 
 # Screen loading
 screenData = open("test.scr","rb").read()
@@ -256,20 +277,7 @@ addPayload(0x4f00, screenData[0x0f00:0x1000], datamod)
 addPayload(0x5700, screenData[0x1700:0x1800], datamod)
 borderFlash(0) # White flash
 
-def genFixup(src,dest,length,spVal,pc):
-    # Z80 version
-    """
-        01 nn nn    ld      bc,length
-        11 nn nn    ld      de,dest
-        21 nn nn    ld      hl,src
-        31 nn nn    ld      sp,spVal
-        ed b0       ldir
-        c3 nn nn    jp      pc
-    """
-    data = pack("<BHBHBHBH3BH",0x01,length,0x11,dest,0x21,src,0x31,spVal,0xed,0xb0,0xc3,pc)
-    #print ":".join("{:02x}".format(ord(c)) for c in data)
-    return data
-
+# Load up print Versaload add-on so we can print strings to screen during the load
 addPayload(printRoutine,open("print.bin","rb").read(),datamod)
 
 # Main code
@@ -285,21 +293,33 @@ printText(0,23,"  This is a demo of Versaload   ")
 addPayload(0xb000, mainData[0x3000:0x3c00], datamod)
 addPayload(0x7c00, mainData[0x3c00:0x4000], datamod) # Load 0xbc00-0xbfff block to 0x7c00 to avoid overwriting loader
 printText(0,23," which can change border colour ")
-addPayload(0xc000, mainData[0x4000:0x4200], datamod)
+addPayload(0xc000, mainData[0x4000:0x4100], datamod)
 borderMain(1)   # Blue border
-addPayload(0xc200, mainData[0x4200:0x4400], datamod)
-borderMain(3)   # Blue border
-addPayload(0xc400, mainData[0x4400:0x4600], datamod)
-borderMain(5)   # Blue border
-addPayload(0xc600, mainData[0x4600:0x4800], datamod)
-borderMain(7)   # Blue border
-addPayload(0xc800, mainData[0x4800:0x4a00], datamod)
-borderMain(5)   # Blue border
-addPayload(0xca00, mainData[0x4a00:0x4c00], datamod)
-borderMain(3)   # Blue border
-addPayload(0xcc00, mainData[0x4c00:0x4e00], datamod)
+addPayload(0xc100, mainData[0x4100:0x4200], datamod)
+borderMain(2)   # Red border
+addPayload(0xc200, mainData[0x4200:0x4300], datamod)
+borderMain(3)   # Magenta border
+addPayload(0xc300, mainData[0x4300:0x4400], datamod)
+borderMain(4)   # Green border
+addPayload(0xc400, mainData[0x4400:0x4500], datamod)
+borderMain(5)   # Cyan border
+addPayload(0xc500, mainData[0x4500:0x4600], datamod)
+borderMain(6)   # Yellow border
+addPayload(0xc600, mainData[0x4600:0x4700], datamod)
+borderMain(7)   # White border
+addPayload(0xc700, mainData[0x4700:0x4800], datamod)
+borderMain(6)   # Yellow border
+addPayload(0xc800, mainData[0x4800:0x4900], datamod)
+borderMain(5)   # Cyan border
+addPayload(0xc900, mainData[0x4900:0x4a00], datamod)
+borderMain(4)   # Green border
+addPayload(0xca00, mainData[0x4a00:0x4b00], datamod)
+borderMain(3)   # Magenta border
+addPayload(0xcb00, mainData[0x4b00:0x4c00], datamod)
+borderMain(2)   # Red border
+addPayload(0xcc00, mainData[0x4c00:0x4d00], datamod)
 borderMain(1)   # Blue border
-addPayload(0xce00, mainData[0x4e00:0x5000], datamod)
+addPayload(0xcd00, mainData[0x4d00:0x5000], datamod)
 printText(0,23," or print text whilst loading.  ")
 addPayload(0xd000, mainData[0x5000:0x6000], datamod)
 printText(0,23,"                                ")
