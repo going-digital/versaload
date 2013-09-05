@@ -9,6 +9,7 @@
 
 loadbase        equ     $BC00
 stackptr        equ     $C000
+printbase       equ     $be00
 
 ; Sync train
 ;

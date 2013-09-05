@@ -186,10 +186,16 @@ with open("boot2.asmgl") as labels:
     for line in labels:
         (label,dummy,value) = line.split()
         labelList[label]=int(value[1:-1],16)
+with open("print.asmgl") as labels:
+    for line in labels:
+        (label,dummy,value) = line.split()
+        labelList[label]=int(value[1:-1],16)
 
 execAddr = labelList['PAYLOAD_JUMP']
 borderFlashAddr = labelList['BORDER_FLASH']
 borderMainAddr = labelList['BORDER_MAIN']
+printRoutine = labelList['PRINT_ROUTINE']
+printParam = labelList['PRINT_PARAM']
 
 def addExec(addr):
     addPayload(execAddr,pack("<BH",0xc3,addr), datamod)
@@ -199,6 +205,14 @@ def borderFlash(colour):
     addPayload(borderFlashAddr,pack("<B",0x8+colour), datamod)
 def borderMain(colour):
     addPayload(borderMainAddr,pack("<B",0x8+colour), datamod)
+def printText(x,y,text):
+    payload = pack("<2H",0x3d00,0x4000+(y//8)*0x800+(y%8)*0x20+x)
+    payload = payload + text
+    payload = payload + pack("<B",0)
+    print(":".join("{:02x}".format(ord(c)) for c in payload))
+    addPayload(printParam,payload,datamod)
+    addCall(printRoutine)
+    datamod.append(BitArray('0b1100')*len(text))
 
 # Screen loading
 screenData = open("test.scr","rb").read()
@@ -256,17 +270,42 @@ def genFixup(src,dest,length,spVal,pc):
     #print ":".join("{:02x}".format(ord(c)) for c in data)
     return data
 
+addPayload(printRoutine,open("print.bin","rb").read(),datamod)
+
 # Main code
 mainData = open("test.raw","rb").read()
 
 # Load 0x8000-0xbbff into final location
-addPayload(0x8000, mainData[0x0000:0x3c00], datamod)
-
-# Load 0xbc00-0xbfff block to 0x7c00 to avoid overwriting loader
-addPayload(0x7c00, mainData[0x3c00:0x4000], datamod)
-
-# Load 0xc000-0xffff into final location
-addPayload(0xc000, mainData[0x4000:0x8000], datamod)
+addPayload(0x8000, mainData[0x0000:0x1000], datamod)
+printText(0,23," Hello World of Spectrum fans!  ")
+addPayload(0x9000, mainData[0x1000:0x2000], datamod)
+printText(0,23,"                                ")
+addPayload(0xa000, mainData[0x2000:0x3000], datamod)
+printText(0,23,"  This is a demo of Versaload   ")
+addPayload(0xb000, mainData[0x3000:0x3c00], datamod)
+addPayload(0x7c00, mainData[0x3c00:0x4000], datamod) # Load 0xbc00-0xbfff block to 0x7c00 to avoid overwriting loader
+printText(0,23," which can change border colour ")
+addPayload(0xc000, mainData[0x4000:0x4200], datamod)
+borderMain(1)   # Blue border
+addPayload(0xc200, mainData[0x4200:0x4400], datamod)
+borderMain(3)   # Blue border
+addPayload(0xc400, mainData[0x4400:0x4600], datamod)
+borderMain(5)   # Blue border
+addPayload(0xc600, mainData[0x4600:0x4800], datamod)
+borderMain(7)   # Blue border
+addPayload(0xc800, mainData[0x4800:0x4a00], datamod)
+borderMain(5)   # Blue border
+addPayload(0xca00, mainData[0x4a00:0x4c00], datamod)
+borderMain(3)   # Blue border
+addPayload(0xcc00, mainData[0x4c00:0x4e00], datamod)
+borderMain(1)   # Blue border
+addPayload(0xce00, mainData[0x4e00:0x5000], datamod)
+printText(0,23," or print text whilst loading.  ")
+addPayload(0xd000, mainData[0x5000:0x6000], datamod)
+printText(0,23,"                                ")
+addPayload(0xe000, mainData[0x6000:0x7000], datamod)
+printText(0,23," But first, here's Penetrator!  ")
+addPayload(0xf000, mainData[0x7000:0x8000], datamod)
 
 # Patch out wait for keypress at 0x800c
 addPayload(0x800c, pack("<2B",0,0), datamod)

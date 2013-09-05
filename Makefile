@@ -19,7 +19,7 @@ all: versaload.tzx versaload.wav
 
 boot1.bin: boot2.bin Makefile
 
-versaload.tzx: boot1.bin test.scr test.raw buildtzx.py Makefile
+versaload.tzx: boot1.bin test.scr test.raw buildtzx.py Makefile print.bin
 	# Construct loader
 	$(PYTHON) buildtzx.py
 	# Add loading screen metadata to TZX
