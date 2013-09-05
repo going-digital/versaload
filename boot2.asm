@@ -268,10 +268,8 @@ measure_symbol:
         ; timing, and won't trigger the glitch delay in measure_half_symbol
         ld      b,glitch_delay-5        ; 7T    \ TODO: Investigate this '5'
         add     a,b                     ; 4T     |
-mslp2:  nop                             ; 4T     |
-        nop                             ; 4T     |
-        nop                             ; 4T     | 32T loop + 6T overhead
-        and     0                       ; 7T     |
+mslp2:  jr      ms_jr                   ;12T     | 32T loop + 6T overhead
+ms_jr:  and     0                       ; 7T     |
         djnz    mslp2                   ;13T/8T /
 
 measure_half_symbol:
