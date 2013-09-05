@@ -285,17 +285,16 @@ measure_half_symbol:
         inc     a               ; 4T 
         cp      glitch_delay    ; 7T loop until a > sync_delay
         jp      nc,measure_half_symbol ; 10T
-
         ld      b,a             ; 4T
 mslp:   inc     b               ; 4T Cycle time is 32T
         in      a,($fe)         ;11T
         and     $40             ; 7T
 ms_cmp: jp      z,mslp          ;10T Selfmodified between Z and NZ
-b_fl:   ld      a,border_blue   ; 7T
-        out     ($fe),a         ;11T
         ld      a,(ms_cmp)      ;13T
         xor     $08             ; 7T Swap jp z and jp nz opcodes
         ld      (ms_cmp),a      ;13T
+b_fl:   ld      a,border_blue   ; 7T
+        out     ($fe),a         ;11T
 b_m:    ld      a,border_white  ; 7T
         out     ($fe),a         ;11T
         ld      a,b             ; 4T
