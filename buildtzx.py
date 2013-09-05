@@ -200,36 +200,46 @@ def borderFlash(colour):
 def borderMain(colour):
     addPayload(borderMainAddr,pack("<B",0x8+colour), datamod)
 
-# Interlaced screen loading
+# Screen loading
 screenData = open("test.scr","rb").read()
-screenData = optimiseScr(screenData)    # Maximise PAPER, minimise INK
-addPayload(0x5800, screenData[0x1800:0x1c00], datamod) # Attributes
-borderMain(1) # Blue border
-borderFlash(7) # Black flash
-addPayload(0x4300, screenData[0x0300:0x0400], datamod) # Row 3
-addPayload(0x4b00, screenData[0x0b00:0x0c00], datamod)
-addPayload(0x5300, screenData[0x1300:0x1400], datamod)
-addPayload(0x4500, screenData[0x0500:0x0600], datamod) # Row 5
-addPayload(0x4d00, screenData[0x0d00:0x0e00], datamod)
-addPayload(0x5500, screenData[0x1500:0x1600], datamod)
-addPayload(0x4100, screenData[0x0100:0x0200], datamod) # Row 1
-addPayload(0x4900, screenData[0x0900:0x0a00], datamod)
-addPayload(0x5100, screenData[0x1100:0x1200], datamod)
-addPayload(0x4700, screenData[0x0700:0x0800], datamod) # Row 7
-addPayload(0x4f00, screenData[0x0f00:0x1000], datamod)
-addPayload(0x5700, screenData[0x1700:0x1800], datamod)
-addPayload(0x4200, screenData[0x0200:0x0300], datamod) # Row 2
-addPayload(0x4a00, screenData[0x0a00:0x0b00], datamod)
-addPayload(0x5200, screenData[0x1200:0x1300], datamod)
-addPayload(0x4400, screenData[0x0400:0x0500], datamod) # Row 4
-addPayload(0x4c00, screenData[0x0c00:0x0d00], datamod)
-addPayload(0x5400, screenData[0x1400:0x1500], datamod)
+
+# Maximise PAPER, minimise INK. This makes initial attributes more closely
+# approximate final loading screen, and maximises 0 bits in screen bitmap
+# which speeds loading (0 bits are always faster than 1 bits)
+screenData = optimiseScr(screenData)
+
+# Load attributes
+addPayload(0x5800, screenData[0x1800:0x1c00], datamod)
+
+# Change border colour / effect to match loading screen
+borderMain(1)   # Blue border
+borderFlash(7)  # White flash
+
+# Load every 4th row
 addPayload(0x4000, screenData[0x0000:0x0100], datamod) # Row 0
 addPayload(0x4800, screenData[0x0800:0x0900], datamod)
 addPayload(0x5000, screenData[0x1000:0x1100], datamod)
+addPayload(0x4100, screenData[0x0100:0x0200], datamod) # Row 1
+addPayload(0x4900, screenData[0x0900:0x0a00], datamod)
+addPayload(0x5100, screenData[0x1100:0x1200], datamod)
+addPayload(0x4200, screenData[0x0200:0x0300], datamod) # Row 2
+addPayload(0x4a00, screenData[0x0a00:0x0b00], datamod)
+addPayload(0x5200, screenData[0x1200:0x1300], datamod)
+addPayload(0x4300, screenData[0x0300:0x0400], datamod) # Row 3
+addPayload(0x4b00, screenData[0x0b00:0x0c00], datamod)
+addPayload(0x5300, screenData[0x1300:0x1400], datamod)
+addPayload(0x4400, screenData[0x0400:0x0500], datamod) # Row 4
+addPayload(0x4c00, screenData[0x0c00:0x0d00], datamod)
+addPayload(0x5400, screenData[0x1400:0x1500], datamod)
+addPayload(0x4500, screenData[0x0500:0x0600], datamod) # Row 5
+addPayload(0x4d00, screenData[0x0d00:0x0e00], datamod)
+addPayload(0x5500, screenData[0x1500:0x1600], datamod)
 addPayload(0x4600, screenData[0x0600:0x0700], datamod) # Row 6
 addPayload(0x4e00, screenData[0x0e00:0x0f00], datamod)
 addPayload(0x5600, screenData[0x1600:0x1700], datamod)
+addPayload(0x4700, screenData[0x0700:0x0800], datamod) # Row 7
+addPayload(0x4f00, screenData[0x0f00:0x1000], datamod)
+addPayload(0x5700, screenData[0x1700:0x1800], datamod)
 borderFlash(0) # White flash
 
 def genFixup(src,dest,length,spVal,pc):
