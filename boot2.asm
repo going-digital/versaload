@@ -266,22 +266,27 @@ measure_symbol:
 
         ; Glitch ignore delay, because A already contains the half-symbol
         ; timing, and won't trigger the glitch delay in measure_half_symbol
-        ld      b,1 ; 7T
-        add     a,b     ; 4T
-mslp2:  nop             ; 4T     \
-        nop             ; 4T      \
-        nop             ; 4T       | 32T loop + 6T overhead
-        and     0       ; 7T      /
-        djnz    mslp2   ; 13T/8T /
+        ld      b,glitch_delay-5        ; 7T    \ TODO: Investigate this '5'
+        add     a,b                     ; 4T     |
+mslp2:  nop                             ; 4T     |
+        nop                             ; 4T     |
+        nop                             ; 4T     | 32T loop + 6T overhead
+        and     0                       ; 7T     |
+        djnz    mslp2                   ;13T/8T /
 
 measure_half_symbol:
-        ; Glitch ignore delay for when A < sync_delay
+        ; Starts checking edge 68T after CALL (including CALL instr)
+        ; If A < glitch_delay, ignore edges until glitch_delay complete
+        ; Returns 100T after edge
+
+        add     a,(100+16)/32     ; 7T Add compensation for return time after last measure_half_symbol call
+
         ; This loop is 32T long, matching the sample loop below
         and     0               ; 7T
         nop                     ; 4T
         inc     a               ; 4T 
         cp      glitch_delay    ; 7T loop until a > sync_delay
-        jp      pe,measure_half_symbol ; 10T
+        jp      nc,measure_half_symbol ; 10T
 
         ld      b,a             ; 4T
 mslp:   inc     b               ; 4T Cycle time is 32T
@@ -297,6 +302,7 @@ b_m:    ld      a,border_white  ; 7T
         out     ($fe),a         ;11T
         ld      a,b             ; 4T
         ret                     ;10T
+
 BORDER_FLASH equ b_fl+1
 BORDER_MAIN equ b_m+1
 
