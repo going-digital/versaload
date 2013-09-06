@@ -172,6 +172,12 @@ def optimiseScr(data):
     data = dataBits.tobytes()
     return data
 
+def addScreen(screenData,datamod):
+    addPayload(0x5800, screenData[0x1800:0x1b00],datamod)
+    for y in range(0,0x800,0x100):
+        for base in range(0x0000,0x1800,0x800):
+            addPayload(0x4000+base+y, screenData[base+y:0x100+base+y],datamod)
+
 datamod.append(BitArray('2000*0b1100'))
 # Wait for BASIC to execute
 #datamod.append(BitArray('40*0b10'))
@@ -219,20 +225,27 @@ def printText(x,y,text):
     payload = payload + pack("<B",0)
     addPayload(printParam,payload,datamod)
     addCall(printRoutine)
-    datamod.append(BitArray('0b1100')*len(text))
-def genFixup(src,dest,length,spVal,pc):
+    datamod.append(BitArray('0b10')*len(text))
+def genFixup(src,dest,length,sp,pc):
     # Relocate memory block and execute payload
     # Z80 version
     """
         01 nn nn    ld      bc,length
         11 nn nn    ld      de,dest
         21 nn nn    ld      hl,src
-        31 nn nn    ld      sp,spVal
         ed b0       ldir
+        31 nn nn    ld      sp,spValFinal
         c3 nn nn    jp      pc
     """
-    data = pack("<BHBHBHBH3BH",0x01,length,0x11,dest,0x21,src,0x31,spVal,0xed,0xb0,0xc3,pc)
-    #print ":".join("{:02x}".format(ord(c)) for c in data)
+    # data = pack("<BHBHBH3BHBH",\
+    #     0x01,length,\
+    #     0x11,dest,\
+    #     0x21,src,\
+    #     0xed,0xb0,\
+    #     0x31,sp,\
+    #     0xc3,pc\
+    #     )
+    data = pack("<BHBH",0x31,sp,0xc3,pc)
     return data
 
 # Screen loading
@@ -243,98 +256,71 @@ screenData = open("test.scr","rb").read()
 # which speeds loading (0 bits are always faster than 1 bits)
 screenData = optimiseScr(screenData)
 
-# Load attributes
-addPayload(0x5800, screenData[0x1800:0x1c00], datamod)
-
 # Change border colour / effect to match loading screen
 borderMain(1)   # Blue border
 borderFlash(7)  # White flash
 
 # Load every 4th row
-addPayload(0x4000, screenData[0x0000:0x0100], datamod) # Row 0
-addPayload(0x4800, screenData[0x0800:0x0900], datamod)
-addPayload(0x5000, screenData[0x1000:0x1100], datamod)
-addPayload(0x4100, screenData[0x0100:0x0200], datamod) # Row 1
-addPayload(0x4900, screenData[0x0900:0x0a00], datamod)
-addPayload(0x5100, screenData[0x1100:0x1200], datamod)
-addPayload(0x4200, screenData[0x0200:0x0300], datamod) # Row 2
-addPayload(0x4a00, screenData[0x0a00:0x0b00], datamod)
-addPayload(0x5200, screenData[0x1200:0x1300], datamod)
-addPayload(0x4300, screenData[0x0300:0x0400], datamod) # Row 3
-addPayload(0x4b00, screenData[0x0b00:0x0c00], datamod)
-addPayload(0x5300, screenData[0x1300:0x1400], datamod)
-addPayload(0x4400, screenData[0x0400:0x0500], datamod) # Row 4
-addPayload(0x4c00, screenData[0x0c00:0x0d00], datamod)
-addPayload(0x5400, screenData[0x1400:0x1500], datamod)
-addPayload(0x4500, screenData[0x0500:0x0600], datamod) # Row 5
-addPayload(0x4d00, screenData[0x0d00:0x0e00], datamod)
-addPayload(0x5500, screenData[0x1500:0x1600], datamod)
-addPayload(0x4600, screenData[0x0600:0x0700], datamod) # Row 6
-addPayload(0x4e00, screenData[0x0e00:0x0f00], datamod)
-addPayload(0x5600, screenData[0x1600:0x1700], datamod)
-addPayload(0x4700, screenData[0x0700:0x0800], datamod) # Row 7
-addPayload(0x4f00, screenData[0x0f00:0x1000], datamod)
-addPayload(0x5700, screenData[0x1700:0x1800], datamod)
+
+addScreen(screenData,datamod)
+
 borderFlash(0) # White flash
 
 # Load up print Versaload add-on so we can print strings to screen during the load
 addPayload(printRoutine,open("print.bin","rb").read(),datamod)
 
 # Main code
-mainData = open("test.raw","rb").read()
+mainData = open("test_packed.bin","rb").read()
 
-# Load 0x8000-0xbbff into final location
-addPayload(0x8000, mainData[0x0000:0x1000], datamod)
-printText(0,23," Hello World of Spectrum fans!  ")
-addPayload(0x9000, mainData[0x1000:0x2000], datamod)
-printText(0,23,"                                ")
-addPayload(0xa000, mainData[0x2000:0x3000], datamod)
-printText(0,23,"  This is a demo of Versaload   ")
-addPayload(0xb000, mainData[0x3000:0x3c00], datamod)
-addPayload(0x7c00, mainData[0x3c00:0x4000], datamod) # Load 0xbc00-0xbfff block to 0x7c00 to avoid overwriting loader
-printText(0,23," which can change border colour ")
-addPayload(0xc000, mainData[0x4000:0x4100], datamod)
-borderMain(1)   # Blue border
-addPayload(0xc100, mainData[0x4100:0x4200], datamod)
-borderMain(2)   # Red border
-addPayload(0xc200, mainData[0x4200:0x4300], datamod)
-borderMain(3)   # Magenta border
-addPayload(0xc300, mainData[0x4300:0x4400], datamod)
-borderMain(4)   # Green border
-addPayload(0xc400, mainData[0x4400:0x4500], datamod)
-borderMain(5)   # Cyan border
-addPayload(0xc500, mainData[0x4500:0x4600], datamod)
-borderMain(6)   # Yellow border
-addPayload(0xc600, mainData[0x4600:0x4700], datamod)
-borderMain(7)   # White border
-addPayload(0xc700, mainData[0x4700:0x4800], datamod)
-borderMain(6)   # Yellow border
-addPayload(0xc800, mainData[0x4800:0x4900], datamod)
-borderMain(5)   # Cyan border
-addPayload(0xc900, mainData[0x4900:0x4a00], datamod)
-borderMain(4)   # Green border
-addPayload(0xca00, mainData[0x4a00:0x4b00], datamod)
-borderMain(3)   # Magenta border
-addPayload(0xcb00, mainData[0x4b00:0x4c00], datamod)
-borderMain(2)   # Red border
-addPayload(0xcc00, mainData[0x4c00:0x4d00], datamod)
-borderMain(1)   # Blue border
-addPayload(0xcd00, mainData[0x4d00:0x5000], datamod)
-printText(0,23," or print text whilst loading.  ")
-addPayload(0xd000, mainData[0x5000:0x6000], datamod)
-printText(0,23,"                                ")
-addPayload(0xe000, mainData[0x6000:0x7000], datamod)
-printText(0,23," But first, here's Penetrator!  ")
-addPayload(0xf000, mainData[0x7000:0x8000], datamod)
+# Load 0x5c00-0xbbff into final location
+addPayload(0x5c00, mainData[0x0000:], datamod)
+printText(0,23,"Loading fixup")
+#addPayload(0xfc00, mainData[0x6000:0x6400], datamod) # Hole for loader
+#addPayload(0xc000, mainData[0x6400:],datamod)
+addPayload(0x5b00, genFixup(0x7c00,0xfc00,0x400,0x5c00,0x5c00), datamod)
+printText(0,23,"Unpacking    ")
+addExec(0x5b00)
 
-# Patch out wait for keypress at 0x800c
-addPayload(0x800c, pack("<2B",0,0), datamod)
+# printText(0,23," Hello World of Spectrum fans!  ")
+# printText(0,23,"                                ")
+# printText(0,23,"  This is a demo of Versaload   ")
+# printText(0,23," which can change border colour ")
+# borderMain(1)   # Blue border
+# borderMain(2)   # Red border
+# borderMain(3)   # Magenta border
+# borderMain(4)   # Green border
+# borderMain(5)   # Cyan border
+# borderMain(6)   # Yellow border
+# borderMain(7)   # White border
+# borderMain(6)   # Yellow border
+# borderMain(5)   # Cyan border
+# borderMain(4)   # Green border
+# borderMain(3)   # Magenta border
+# borderMain(2)   # Red border
+# borderMain(1)   # Blue border
+# printText(0,23," or print text whilst loading.  ")
+# printText(0,23,"                                ")
+# printText(0,23," But first, here's Penetrator!  ")
+# # Patch out wait for keypress at 0x800c
+# addPayload(0x800c, pack("<2B",0,0), datamod)
 
 # Load relocate/execute code at 0x7000
-addPayload(0x7000, genFixup(0x7c00,0xbc00,0x400,0x5fff,0x8000), datamod)
+# This relocates the 0x7c00-0x7fff code block back to the correct place
+# and then jumps to the game entry point at 0x8000
+# Memory map whilst loading:
+#   0x4000-0x5AFF   Loading screen
+#   0x5B00-0x5B80   ZX7 decompressor
+#   0x6000-0xDFFF   Compressed image (may be less)
+# Memory map after loading complete, before executing fixup/decompressor
+#   0x4000-0x5AFF   Loading screen
+#   0x5B80-0x5C00   Fixup code
+
+#   0x8000-0xFFFF   Decompressed image
+#
+# addPayload(0x7000, genFixup(0x7c00,0xbc00,0x400,0x5fff,0x8000), datamod)
 
 # Execute relocate code, then game
-addExec(0x7000)
+# addExec(0x7000)
 
 
 # Add final tape state (so last symbol can be decoded)
