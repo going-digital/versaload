@@ -1,5 +1,4 @@
         include "globals.inc"
-        include "undoc_instr.inc"
 
         org printbase
 
