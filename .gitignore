@@ -48,3 +48,23 @@ profile2map
 raw2hdf
 
 *.asmgl
+
+*.exe
+
+*.out
+
+exomizer
+
+*.o
+
+exomizer207/src/b2membuf
+
+*.exo_b
+
+exomizer207/src/sfxdecr
+
+exomizer207/src/exoraw
+
+exomizer207/src/exobasic
+
+exomizer207/src/deps
