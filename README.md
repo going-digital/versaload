@@ -6,12 +6,11 @@ Versaload uses the accumulated tricks from reliable fast tape loaders of the pas
 
   * Uses tape signal timing based on three known good loaders - the Sinclair ZX Spectrum ROM (1982), [Turbo Tape 64](http://codebase64.org/doku.php?id=base:turbotape_loader_source) (1983) and the [Microsphere loader](http://www.worldofspectrum.org/infoseekpub.cgi?regexp=^Microsphere$ ) (1984).
   * Automatic calibration to tape playback speed
-  * Uses 8 symbols instead of 2, to improve data density.
-  * [Huffman coding](http://en.wikipedia.org/wiki/Huffman_coding) is used to optimise the data rate across different symbol lengths.
+  * Uses 4 symbols instead of 2, to improve data density.
   * Very fast synchronisation
   * Python based scriptable tape mastering environment, compatible with standard emulator file formats and audio output.
 
-This gives a predicted rate of around *6562 bit∙s⁻¹*, 4.2 times the speed of the Spectrum default loader.
+This gives a predicted rate of around *4500 bit∙s⁻¹*, 3 times the speed of the Spectrum default loader.
 
 More information on this is [in the wiki.](https://github.com/going-digital/versaload/wiki)
 
@@ -22,9 +21,19 @@ More information on this is [in the wiki.](https://github.com/going-digital/vers
   * [Fuse](http://fuse-emulator.sourceforge.net)
   * Fuse-utils (tzxlist, tap2wav)
   * [Python Bitstring](http://code.google.com/p/python-bitstring/)
-This code incorporates Ian Chapman's Python TZX library.
 
-## License
+## Credits
+Uses Ian Chapman's [Python TZX library](http://software.amiga-hardware.com/pytzx.cgi).
+Uses Einar Saukas's [ZX7 compression library](http://www.worldofspectrum.org/infoseekid.cgi?id=0027996).
+Uses Magnus Lind's [Exomizer 2](http://hem.bredband.net/magli143/exo/) with Metalbrain's Z80 unpacker.
+
+## Licenses
+Files in the zx7 directory are provided under a BSD-3 license. See zx7.txt for details.
+Files in the Exomizer207 directory are provided under a seperate license. See zx7.txt for details.
+Files in the modules directory are provided under a GPL-2 license. See directory contents for details.
+
+Other files are provided under the MIT license described below.
+
 The MIT License (MIT)
 
 Copyright (c) 2013 Peter Knight aka GoingDigital
