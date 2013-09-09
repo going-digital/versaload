@@ -13,8 +13,6 @@ from screenutil import *
 
 tape = TZX()
 
-timeMargin = 1.2
-
 """
 File metadata
 """
