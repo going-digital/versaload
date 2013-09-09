@@ -41,24 +41,16 @@ boot1.bin: boot2.bin
 test_packed.bin: test.raw.exo_b
 test2_packed.bin: test2.raw.exo_b
 
-versaload.tzx: boot1.bin test.scr buildtzx.py print.bin test_packed.bin
+test.tzx: boot1.bin test.scr buildtzx.py print.bin test_packed.bin
 	# Construct loader
 	$(PYTHON) buildtzx.py
 	# Add loading screen metadata to TZX
-	$(TAPECONV) -s test.scr versaload.tzx versaload.tzx
+	$(TAPECONV) -s test.scr test.tzx test.tzx
 	# Report loading time
-	$(TZXLIST) versaload.tzx
+	$(TZXLIST) test.tzx
 
-versaload2.tzx: boot1.bin test2.scr buildtzx.py print.bin test2_packed.bin
-	# Construct loader
-	$(PYTHON) test2.py
-	# Add loading screen metadata to TZX
-	$(TAPECONV) -s test2.scr versaload2.tzx versaload2.tzx
-	# Report loading time
-	$(TZXLIST) versaload2.tzx
-
-fuse: versaload.tzx
-	$(FUSE) --machine plus2 --no-detect-loader --tape versaload.tzx
+fuse: test.tzx
+	$(FUSE) --machine plus2 --no-detect-loader --tape test.tzx
 
 zx7compress: zx7/src/compress.c zx7/src/optimize.c zx7/src/zx7.c
 	$(CC) zx7/src/compress.c zx7/src/optimize.c zx7/src/zx7.c -o zx7compress

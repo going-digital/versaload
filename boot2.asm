@@ -1,277 +1,245 @@
 ; This code _must_ execute in uncontended memory as it is time critical.
 
-; TODO: Get this code complete and tested
+; BMC decoder
+;
+
+; Selfmodifying code notes:
+;       sm1     jp m or jp p: Wait for positive or negative edge
+;       sm2     scf or xor a: Set or clear carry from last received bit
+;       sm3     Jump address for bit state machine
+;       sm4     Border flash when loading
+;       sm5     Border main when loading
+;       sm6     Border flash after loading error
+;       sm7     Border main after loading error
+;       sm8     Baud rate adjustment
+;       sm9     Current border flash
+;       smA     Current border main
+;       smB     jp m or jp p: Bit decision
 
         include "globals.inc"
-        include "undoc_instr.inc"
 
-        org loadbase
+        org     loadbase
 
-        ; Sync:
-        ;
-        ; Look for a specific 32 step data pattern
-        ; This has multiple functions:
-        ;   1) Take up the unknown slack before the next pattern
-        ;   2) Handle any inversion in the audio system
-        xor     a                    ; 4T
-sync:
-sync_loop:
-        call    measure_half_symbol     ; 17T [edge+111T]
-        cp      sync_threshold          ; 7T  [edge+118T] carry set if time > threshold
-        ccf                             ; 4T [edge+122T]
-        rl      e                       ; 8T [edge+130T]
-        rl      d                       ; 8T [edge+138T]
-        rl      l                       ; 8T [edge+146T]
-        rl      h                       ; 8T [edge+154T]
-        ld      a,sync_train_1          ; 7T [edge+161T]
-        cp      h                       ; 4T [edge+165T]
-        ld      a,+(69+16)/32           ; 7T [edge+172T]
-        jr      nz,sync_loop            ; 12T/7T [edge+179/184T]
-        ld      a,sync_train_2          ; 7T [edge+186T]
-        cp      l                       ; 4T [edge+190T]
-        ld      a,+(94+16)/32           ; 7T [edge+197T]
-        jr      nz,sync_loop            ; 12T/7T [edge+204/209T]
-        ld      a,sync_train_3          ; 7T [edge+211T]
-        cp      d                       ; 4T [edge+215T]
-        ld      a,+(119+16)/32          ; 7T [edge+222T]
-        jr      nz,sync_loop            ; 12T/7T [edge+229/234T]
-        ld      a,sync_train_4          ; 7T [edge+236T]
-        cp      e                       ; 4T [edge+240T]
-        ld      a,+(144+16)/32          ; 7T [edge+247T]
-        jr      nz,sync_loop            ; 12T/7T [edge+254/259T]
+bmc:    ld      de,$ffff        ; Inhibit sync pattern detection for at least 16 bits
 
-        ; Calibrate:
-        ;
-        ; Measure a test pattern.
-        ; From this test, we calibrate the thresholds for pulse measurement
-        ; later. This corrects for variation in record and playback motors
-        ; as well as tape stretch, which gives much more accurate
-        ; descrimination between symbols.
-calibrate:
-        ld      hl,0                    ; 10T [edge+264T]
-        ld      d,h                     ; 4T [edge+268T]
-        ld      e,l                     ; 4T [edge+272T]
-        ld      a,+(279+16)/32          ; 7T [edge+279T]
-        call    measure_symbol          ;[edge+296T] 17T [edge+111T]
-        ld      l,a                     ; 4T [edge+115T]
-        ld      a,+(139+16)/32          ; 7T [edge+122T]
-        call    measure_symbol          ;[edge+139T] 17T [edge+111T]
-        ld      e,a                     ; 4T [edge+115T]
-        add     hl,de                   ; 11T [edge+126T]
-        ld      a,+(150+16)/32          ; 7T [edge+133T]
-        call    measure_symbol          ;[edge+150T] 17T [edge+111T]
-        ld      e,a                     ; 4T [edge+115T]
-        add     hl,de                   ; 11T [edge+126T]
-        ld      a,+(150+16)/32          ; 7T [edge+133T]
-        call    measure_symbol          ;[edge+150T] 17T [edge+111T]
-        ld      e,a                     ; 4T [edge+115T]
-        add     hl,de                   ; 11T [edge+126T]
+        ; Wait for positive edge, then sample at 0.75 bit periods
+waitEdge:
+        in      a,($fe)         ; 11T [edge+11] Loop time 25T
+        add     a,a             ; 4T [edge+15]
+sm1:    jp      m,waitEdge      ; 10T [edge+25]
 
-        ; HL now contains the duration of four 8 period delays.
-        ; Multiply by 8:
-        add     hl,hl                   ; 11T [edge+137T]
-        add     hl,hl                   ; 11T [edge+148T]
-        ; H contains 0.5 period delay
-        ld      b,h                     ; 4T B: 0.5 periods [edge+154T]
-        add     hl,hl                   ; 11T [edge+165T]
-        ; H now contains the average measured 1 period time
-        ld      c,h                     ; 4T C: 1 period [edge+169T]
-        add     hl,hl                   ; 11T [edge+180T]
-        ld      d,h                     ; 4T D: 2 periods [edge+184T]
-        add     hl,hl                   ; 11T [edge+195T]
-        ld      e,h                     ; 4T E: 4 periods [edge+199T]
-        add     hl,hl                   ; 4T H: 8 periods [edge+203T]
-        ; Now to calculate the thresholds
-        ; Done in Gray code order for fastest calculation speed.
-        ld      a,c                     ; 4T [edge+207T]
-        add     a,d                     ; 4T [edge+211T]
-        ld      (thres_3),a             ; 13T [edge+224T]
-        add     a,e                     ; 4T [edge+228T]
-        ld      (thres_7),a             ; 13T [edge+241T]
-        sub     d                       ; 4T [edge+244T]
-        ld      (thres_5),a             ; 13T [edge+257T]
+        ; Whilst waiting for the next sampling point, process the last received
+        ; bit.
+        ; This means we have 0.75 bit periods to work, rather than 0.25.
 
-        ; Readdata:
-        ;
-        ; Read symbols, quantise to the correct period and pass to the
-        ; decoding engine to extract real data.
-        ;
-        ; Tree Length Encoding
-        ;  / 220us  00
-        ; /\ 440us  01
-        ; \/ 660us  10
-        ;  \ 880us  11
+sm2:    scf                     ; 4T [edge+29] Self modified: set or clear carry
+sm3:    jp      stage1          ; 10T [edge+40] Self modified: jump to bit processing step
 
-        ; This part is unrolled for speed. The entire loop from edge to edge
-        ; must complete within 700T otherwise the next pulse measurement may
-        ; be compromised.
+stage1: ; Wait for synchronisation pattern ('00111111 11111101')
+        ; which matches the EBU LTC pattern
+        rl      e               ; 8T [edge+48]
+        rl      d               ; 8T [edge+56]
+        ld      a,$3f           ; 7T [edge+63]
+        xor     d               ; 4T [edge+67]
+        ld      b,30-6          ; 7T [edge+74]
+        jp      nz,endstage     ; 10T [edge+84] -6 => -78T delay
+        ld      a,$fd           ; 7T [edge+91]
+        xor     e               ; 4T [edge+95]
+        ld      b,30-9          ; 7T [edge+102]
+        jp      nz,endstage     ; 10T [edge+112] -9 => -117T delay
 
-selfmodified    equ     0       ; Dummy value placeholder for selfmodified code
+        ld      hl,stage2       ; 10T [edge+122] Synchronisation pattern match
+        ld      (sm3+1),hl      ; 16T [edge+138]
+        ld      bc,+(30-14)*256+8; 10T [edge+148] Set block length, and delay compensation
+        ld      de,$0100        ; 10T [edge+158]
+        ld      ix,headerParam  ; 14T [edge+172]
+        jp      endstage        ; 10T [edge+182] -14 => -138T delay
 
-; Set up to load payload
-        ; [edge+257T]
-        ld      hl,payload_base         ; 10T [edge+267T]
-        ld      bc,payload_end_header   ; 10T [edge+277T]
-        ld      a,b                     ; 4T [edge+281T]
-        ld      (end_h),a               ; 13T [edge+294T]
-        ld      a,c                     ; 4T [edge+298T]
-        ld      (end_l),a               ; 13T [edge+311T]
+stage2: ; Read block header and verify
+        ; c: byte count
+        ; d: incoming shift register / bit counter
+        ; e: checksum
 
-        ld      d,$01                   ; 7T [edge+318T]
-        xor     a                       ; 4T [edge+322T]
-        ld      (payload_data),a        ; 13T [edge+335T]
-        ld      a,+(342+16)/32          ; 7T [edge+342T]
-readdata:
-        call    measure_symbol          ; 17T [edge+111T]
-smc01:  cp      selfmodified            ; 7T    thres_5 stored here [edge+119T]
-        ccf                             ; 4T [edge+123T]
-        jp      c,bits_1_               ; 10T [edge+133T]
-        call    addbit                  ; 61T [edge+194T]
-smc02:  cp      selfmodified            ; 7T    thres_3 stored here [edge+201T]
-        ccf                             ; 4T [edge+205T]
-        call    addbit                  ; 61T [edge+266T]
-        jp      readdataend             ; 10T [edge+276T]
+        rl      d               ; 8T [edge+48]
+        ld      b,30-5          ; 7T [edge+55]
+        jp      nc,endstage     ; 10T [edge+65] -5 => -65T delay
+        ; Complete byte received
+        ld      a,e             ; 4T [edge+69]
+        add     a,d             ; 4T [edge+73]
+        ld      e,a             ; 4T [edge+77]
+        ld      (ix+0),d        ; 19T [edge+96]
+        ld      d,$01           ; 7T [edge+103] Reset byte counter
+        inc     ix              ; 10T [edge+113]
+        dec     c               ; 4T [edge+117]
+        ld      b,30-10         ; 7T [edge+124]
+        jp      nz,endstage     ; 10T [edge+134] -10 => -130T delay
+        ; Complete header received
+        ; Verify checksum
+        rlc     e               ; 8T [edge+142] Is checksum zero?
+        ld      hl,stageerr     ; 10T [edge+152]
+        ld      (sm3+1),hl      ; 16T [edge+168]
+        ld      b,30-14         ; 7T [edge+175]
+        jp      nz,endstage     ; 10T [edge+185] -14 => -138T delay
+        ; Verify block number
+        ld      de,(nextblk)    ; 20T [edge+205]
+        ld      hl,(blknum)     ; 16T [edge+221]
+        and     a               ; 4T [edge+225] clear carry
+        adc     hl,de           ; 15T [edge+240] add hl,de doesn't adjust carry flag
+        ld      b,30-20         ; 7T [edge+247]
+        jp      nz,stageerr    ; 10T [edge+257] -20 => 260T delay
+        ; Handle block mode
+        ld      ix,(blkaddr)    ; 20T [edge+277] Set load address
+        ld      a,(blktype)     ; 13T [edge+290]
+        and     a               ; 4T [edge+294]
+        jp      z,blkData       ; 10T [edge+304]
+        call    exec            ; 17T [edge+321] Handle execution block
+        ld      hl,(nextblk)    ; 16T [edge+?] Advance block counter
+        dec     hl              ; 6T [edge+?]
+        ld      (nextblk),hl    ; 16T [edge+?]
+        ld      hl,stage1       ; 10T [edge+?]
+        ld      (sm3+1),hl      ; 16T [edge+?]
+        ld      de,$ffff        ; 10T [edge+?]
+        ld      b,1             ; 7T [edge+?]
+        jp      endstage        ; 10T [edge+?] Delay unknown. Resync after exec block.
 
-bits_1_:call    addbit                  ; 61T [edge+194T]
-smc03:  cp      selfmodified            ; 7T    thres_7 stored here [edge+201T]
-        ccf                             ; 4T [edge+205T]
-        call    addbit                  ; 61T [edge+266T]
-        jp      readdataend             ; 10T [edge+276T] This balances timings
+exec    jp      (ix)            ; 10T [edge+327]
 
-thres_3         equ     smc02+1
-thres_5         equ     smc01+1
-thres_7         equ     smc03+1
 
-readdataend:
-        ; [edge+276T]
-        ; Up to 4 bits can be added for each symbol.
-        ; Once BC=HL, the block is over.
-        ld      a,h                     ; 4T [edge+280T]
-smc10:  cp      selfmodified            ; 7T [edge+287T]
-        ld      a,+(404+16)/32          ; 7T [edge+394T]
-        jp      nz,readdata             ; 10T [edge+404T]
-        ld      a,l                     ; 4T [edge+414T]
-smc11:  cp      selfmodified            ; 7T [edge+421T]
-        ld      a,+(438+16)/32          ; 7T [edge+428T]
-        jp      nz,readdata             ; 10T [edge+438T]
-        ; Payload section is complete.
-        ld      a,(payload_data)        ; 13T [edge+451T]
-        and     a                       ; 4T [edge+455T]
-        jp      nz,payload_complete     ; 10T [edge+465T]
+blkData:; Set up for data load
+        ld      a,(blklen)      ;13T [edge+313] Set block length
+        ld      c,a             ;4T [edge+317]
+        ld      a,(blksum)      ;13T [edge+330] Set checksum
+        ld      e,a             ;4T [edge+334]
+        ld      hl,stage3       ;10T [edge+344]
+        ld      (sm3+1),hl      ;16T [edge+360]
+        ld      d,$01
+        ld      b,30-29         ;7T [edge+367]
+        jp      endstage        ;10T [edge+377] -29 => 377T delay
 
-end_h   equ     smc10+1
-end_l   equ     smc11+1
+stage3: ; Read data and verify
+        rl      d               ; 8T [edge+48]
+        ld      b,30-5          ; 7T [edge+55]
+        jp      nc,endstage     ; 10T [edge+65] -5 => 65T delay
+        
+        ; At this point, data is already corrupt. Shifted?
 
-        ; Payload header loaded:
-        ; Set up load and end address
-        ; TODO: Handle block number
-        ; TODO: Handle checksum
 
-        ld      hl,(loadaddr)           ; 16T [edge+481T]
-        ld      bc,(endaddr)            ; 20T [edge+501T]
-        ld      a,b                     ; 4T [edge+505T]
-        ld      (end_h),a               ; 13T [edge+518T]
-        ld      a,c                     ; 4T [edge+524T]
-        ld      (end_l),a               ; 13T [edge+537T]
-        ld      a,$01                   ; 7T [edge+544T]
-        ld      (payload_data),a        ; 13T [edge+557T]
-        ld      a,+(574+16)/32          ; 7T [edge+564T]
-        jp      readdata                ; 10T [edge+574T] 574T = 164µs
 
-payload_complete:
-        ; No concern about counts past edge now, as next stage will be to resynchronise
-        nop                             ; Loader can insert a CALL or JP here
-        nop                             ; to execute external routines
-        nop                             ;
-        xor     a                       ; 0 is opcode for NOP
-        ld      (payload_complete),a    ; 13T
-        ld      (payload_complete+1),a  ; 13T
-        ld      (payload_complete+2),a  ; 13T
-        jp      sync                    ; 10T
+; E1 (blue paper) E0 (black paper)
+; 11100001        11100000
 
-PAYLOAD_JUMP equ payload_complete
+; Should be blue paper white ink
+; 0?001111        0?000111
 
-        ; addbit
-        ;
-        ; Adds the carry flag contents into the incoming data shift register
-        ;
-        ; On entry:
-        ;       carry: Bit to add
-        ; On exit:
-        ;       DHL: updated
-        ; Caller must preserve:
-        ;       D: shift register
-        ;       HL: memory pointer
-        ; Execution time
-        ;       CALL addbit takes either 
-        ;               17+44 T states (7/8 times)
-        ;               17+45 T states (1/8 times)
-        ;       Assume CALL addbit takes 61T
-        ;
-addbit: rl      d               ; 8T [call+25T]
-        jr      nc,delab        ; 7/12T [call+32/37T]
-        ld      (hl),d          ; 7T [call+39T]
-        ld      d,$01           ; 7T [call+46T]
-        inc     hl              ; 6T [call+52T]
-retab:  ret                     ; 10T [call+61/62T]
-delab:  nop                     ; 4T [call+41T]
-        jp      retab           ; 10T [call+51T]
+;0x0011110x001111  0x0001110x000111
 
-        ; measure_symbol and measure_half_symbol
-        ;
-        ; Measures duration of next half-symbol (time high or time low)
-        ; or next full symbol (total of high and low period)
-        ;
-        ; On entry:
-        ;       A: number of T states since last edge, in multiples of 32.
-        ; On exit:
-        ;       A: number of T states to edge, in multiples of 32.
-        ; Corrupts:
-        ;       B
-        ;
-measure_symbol:
-        call    measure_half_symbol ; 17T [edge+111T]
+; Black area:
+; 
 
-        ; Glitch ignore delay, because A already contains the half-symbol
-        ; timing, and won't trigger the glitch delay in measure_half_symbol
-        ld      b,glitch_delay-5        ; 7T    \ TODO: Investigate this '5'
-        add     a,b                     ; 4T     |
-mslp2:  jr      ms_jr                   ;12T     | 32T loop + 6T overhead
-ms_jr:  and     0                       ; 7T     |
-        djnz    mslp2                   ;13T/8T /
 
-measure_half_symbol:
-        ; Starts checking edge 68T after CALL (including CALL instr)
-        ; If A < glitch_delay, ignore edges until glitch_delay complete
+        ; Complete byte received
+        ld      a,e             ; 4T [edge+69] Update checksum
+        add     a,d             ; 4T [edge+73]
+        ld      e,a             ; 4T [edge+77]
+        ld      (ix+0),d        ; 19T [edge+96]
+        ld      d,$01           ; 7T [edge+103] Reset bit counter
+        inc     ix              ; 10T [edge+113]
+        dec     c               ; 4T [edge+117] Count bytes
+        ld      b,30-10         ; 7T [edge+124]
+        jp      nz,endstage     ; 10T [edge+134] -10 => 130T delay
+        ; Verify checksum
+        rlc     e               ; 8T [edge+142] Is checksum zero?
+        ld      hl,stageerr     ; 10T [edge+152]
+        ld      (sm3+1),hl      ; 16T [edge+168]
+        ld      b,30-14         ; 7T [edge+175]
+        jp      nz,endstage     ; 10T [edge+185] -14 => 182T delay
+        ; Advance block counter
+        ld      hl,(nextblk)    ; 16T [edge+201]
+        dec     hl              ; 6T [edge+207]
+        ld      (nextblk),hl    ; 16T [edge+223]
+        ; Clear loading error indication
+sm4:    ld      a,9             ; 7T [edge+230] Blue flash
+        ld      (sm9+1),a       ; 13T [edge+243]
+sm5:    ld      a,8             ; 7T [edge+230] Black border
+        ld      (smA+1),a       ; 13T [edge+243]
+        ; Synchronise for next block
+        ld      hl,stage1       ; 10T [edge+253]
+        ld      (sm3+1),hl      ; 16T [edge+269]
+        ld      de,$ffff        ; 10T [edge+279]
+        ld      b,30-23         ; 7T [edge+286]
+        jp      endstage        ; 10T [edge+296] -23 => 299T
 
-        ; This loop is 32T long, matching the sample loop below
-        and     0               ; 7T
-        nop                     ; 4T
-        inc     a               ; 4T 
-        cp      glitch_delay    ; 7T loop until a > sync_delay
-        jp      nc,measure_half_symbol ; 10T
-        ld      b,a             ; 4T
-mslp:   inc     b               ; 4T Cycle time is 32T
-        in      a,($fe)         ;11T [edge+11T]
-        and     $40             ; 7T
-ms_cmp: jp      z,mslp          ;10T Selfmodified between Z and NZ
-        ld      a,(ms_cmp)      ;13T
-        xor     $08             ; 7T Swap jp z and jp nz opcodes
-        ld      (ms_cmp),a      ;13T
-b_fl:   ld      a,border_blue   ; 7T
-        out     ($fe),a         ;11T
-b_m:    ld      a,border_white  ; 7T
-        out     ($fe),a         ;11T
-        ld      a,b             ; 4T
-        ret                     ;10T [edge+111T]
+stageerr: ; Last block was corrupt
+        ld      hl,stage1       ; 10T [edge+50T]
+        ld      (sm3+1),hl      ; 16T [edge+66]
+        ld      de,$ffff        ; 10T [edge+76]
+        ; Set loading error indication
+sm6:    ld      a,$b            ; 7T [edge+83] Magenta flash
+        ld      (sm9+1),a       ; 13T [edge+96]
+sm7:    ld      a,$a            ; 7T [edge+103] Red border
+        ld      (smA+1),a       ; 13T [edge+116]
+        ld      b,30-10         ; 7T [edge+123]
+        jp      endstage        ; 10T [edge+133] -10 => 130T
 
-BORDER_FLASH equ b_fl+1
-BORDER_MAIN equ b_m+1
+endstage:
+        ; Loop to balance alternate code path timings
+        ; 13 cycles per unit
+dellp:  djnz    dellp           ; Wait 0.75 bit periods
+        ; [edge+390T]
+        ; Baud rate adjustment
+sm8:    ld      b,37            ; 3000 baud
+del2lp: djnz    del2lp
 
-payload_data:   db      0
-payload_base:
-blocknum:       dw      0       ; Payload block number
-loadaddr:       dw      0       ; Load address
-endaddr:        dw      0       ; Last byte of payload + 1
-checksum:       dw      0       ; Space allocated for future checksum
-payload_end_header:
+sm9:    ld      a,$9            ; Default flash blue
+        out     ($fe),a
+smA:    ld      a,$f            ; Default border white
+        out     ($fe),a
+
+        ; Next bit sample point
+        ; Baud 1b    0.75b Loops
+        ; 1500 2333T 1750T 105
+        ; 2000 1750T 1313T 71   Equiv to ROM
+        ; 2500 1400T 1050T 51
+        ; 3000 1167T 875T  37
+        ; 3500 1000T 750T  28
+        ; 4000 875T  656T  20   Equiv to Microsphere
+        ; 4500 778T  583T  15
+        ; 5000 700T  525T  10
+        ; 5500 636T  477T  7
+        ; 6000 583T  438T  4
+        ; 6500 538T  404T  1
+        ; 7000 500T  375T  n/a
+
+
+        in      a,($fe)         ; 11T
+        add     a,a             ; 4T
+smB:    jp      m,rx0           ; 10T
+rx1:    ; Just received a 1 bit. Invert sense next time.
+        ld      a,(sm1)
+        xor     $08             ; Swap jp p and jp m instructions
+        ld      (sm1),a         ;
+        ld      (smB),a
+        ld      a,SCF_OPCODE
+        ld      (sm2),a
+        jp      waitEdge
+
+rx0:    ld      a,ANDA_OPCODE   ; Just received a 0 bit. No need to invert.
+        ld      (sm2),a         ; 4T Clear carry flag
+        jp      waitEdge
+
+nextblk dw      0
+
+        ; Header block, 8 bytes long.
+headerParam:
+blknum  ds      2               ; Block number, incrementing from 0000
+blkaddr ds      2               ; Block address.
+blklen  ds      1               ; Data length, 1-256 bytes (0=256 bytes)
+blktype ds      1               ; 0: Load data. 1: Call code
+blksum  ds      1               ; Checksum of data block (so additive sum = 0)
+blkhsum ds      1               ; Checksum of header block (so additive sum = 0)
+
+; Exports
+BORDER_FLASH            equ     sm4+1
+BORDER_MAIN             equ     sm5+1
+BORDER_ERROR_FLASH      equ     sm6+1
+BORDER_ERROR_MAIN       equ     sm7+1

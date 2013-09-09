@@ -17,13 +17,13 @@ class Bmc:
         """
         for b in datastream:
             if self.__lastState:
-                if b=='0b1':
+                if b:
                     self.__data.append('0b00')
                     self.__lastState = False
                 else:
                     self.__data.append('0b01')
             else:
-                if b=='0b1':
+                if b:
                     self.__data.append('0b11')
                     self.__lastState = True
                 else:
@@ -48,30 +48,40 @@ class Versaload:
     def __addheader(self):
         self.__bitstream.append('0b0011111111111101')
     def delay(self, time):
+        print "Wait ",time
         self.__bitstream.append('0b1'*int(round((self.__baud*time))))
     def load(self, address, data):
-        # Build header
-        #
-        length = len(data) % 256
-        dataChecksum = 0
-        for byte in list(data):
-            dataChecksum = (dataChecksum + ord(byte)) % 256
-        dataChecksum = (256 - dataChecksum) % 256
-        header = struct.pack('<HH',self.__blockNumber,address)
-        header = header + struct.pack('<BBB',length,0,dataChecksum)
-        headerChecksum = 0
-        for byte in list(header):
-            headerChecksum = (headerChecksum + ord(byte)) % 256
-        headerChecksum = (256 - headerChecksum) % 256
-        header = header + struct.pack('<B',headerChecksum)
-        # Add data
-        #
-        self.__addheader()
-        self.__bitstream.append(BitArray(bytes=header))
-        self.__bitstream.append(BitArray(bytes=data))
-        # Prepare for next block
-        self.__blockNumber = self.__blockNumber + 1
+        while len(data) > 0:
+            print hex(self.__blockNumber),"Load",hex(address)
+            dataBlock = data[:0x100]
+            # Build header
+            #
+            length = len(dataBlock) % 256
+            dataChecksum = 0
+            for byte in list(dataBlock):
+                dataChecksum = (dataChecksum + ord(byte)) % 256
+            dataChecksum = (256 - dataChecksum) % 256
+            header = struct.pack('<HH',self.__blockNumber,address)
+            header = header + struct.pack('<BBB',length,0,dataChecksum)
+            headerChecksum = 0
+            for byte in list(header):
+                headerChecksum = (headerChecksum + ord(byte)) % 256
+            headerChecksum = (256 - headerChecksum) % 256
+            header = header + struct.pack('<B',headerChecksum)
+
+            # Add data
+            #
+            self.__addheader()
+            self.__bitstream.append(BitArray(bytes=header))
+            self.__bitstream.append(BitArray(bytes=dataBlock))
+            # Prepare for next block
+            self.__blockNumber = self.__blockNumber + 1
+            data = data[0x100:]
+            address = address + 0x100
+        self.__bitstream.append('0xff')
+
     def execute(self, address, execTime):
+        print hex(self.__blockNumber),"Exec",hex(address)
         # Build header
         #
         header = struct.pack('<HH',self.__blockNumber, address)
@@ -81,12 +91,18 @@ class Versaload:
             headerChecksum = (headerChecksum + ord(byte)) % 256
         headerChecksum = (256 - headerChecksum) % 256
         header = header + struct.pack('<B',headerChecksum)
+        
         # Generate bitstream
         self.__addheader()
         self.__bitstream.append(BitArray(bytes=header))
+        self.__bitstream.append('0xff')
         self.delay(execTime)
+        # Prepare for next block
+        self.__blockNumber = self.__blockNumber + 1
+
     def tStatesPerSample(self):
         return int(round(0.5*3500000/self.__baud))
+
     def get(self):
         # Modulate bitstream before returning it
         modulated = Bmc()
