@@ -49,8 +49,19 @@ test.tzx: boot1.bin test.scr buildtzx.py print.bin test_packed.bin
 	# Report loading time
 	$(TZXLIST) test.tzx
 
+test2.tzx: boot1.bin test2.scr buildtzx.py print.bin test2_packed.bin
+	# Construct loader
+	$(PYTHON) test2.py
+	# Add loading screen metadata to TZX
+	$(TAPECONV) -s test2.scr test2.tzx test2.tzx
+	# Report loading time
+	$(TZXLIST) test2.tzx
+
 fuse: test.tzx
 	$(FUSE) --machine plus2 --no-detect-loader --tape test.tzx
+
+fuse2: test2.tzx
+	$(FUSE) --machine plus2 --no-detect-loader --tape test2.tzx
 
 zx7compress: zx7/src/compress.c zx7/src/optimize.c zx7/src/zx7.c
 	$(CC) zx7/src/compress.c zx7/src/optimize.c zx7/src/zx7.c -o zx7compress
