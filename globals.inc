@@ -22,6 +22,14 @@ sync_train_4    equ     $ff
 sync_threshold  equ     +(770+16)/32   ; 770T = 220us = sqrt(110 * 440)
 glitch_delay    equ     +(308+16)/32   ; 308T = 88us = 110us - 20%
 
+; Symbols are 110 and 440µs long, so set threshold at geometric mean, 220µs
+;sync_threshold  equ     +(1089+16)/32   ; 1089T = 311us = sqrt(156 * 622)
+;glitch_delay    equ     +(436+16)/32   ; 436T = 124us = 110us - 20%
+
+; Symbols are 220 and 880µs long, so set threshold at geometric mean, 220µs
+;sync_threshold  equ     +(770+16)/32   ; 770T = 220us = sqrt(110 * 440)
+;glitch_delay    equ     +(308+16)/32   ; 308T = 88us = 110us - 20%
+
 ; Border values for OUT($fe)
 border_black    equ     $08
 border_blue     equ     $09
@@ -31,3 +39,7 @@ border_green    equ     $0c
 border_cyan     equ     $0d
 border_yellow   equ     $0e
 border_white    equ     $0f
+
+; Opcode literals
+SCF_OPCODE      equ     $37     ; Sets carry flag
+ANDA_OPCODE     equ     $a7     ; Clears carry flag
