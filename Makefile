@@ -36,12 +36,18 @@ all: versaload.tzx versaload.wav
 %.zx7: % zx7compress
 	$(ZX7) $< $@
 
+setbaud.asm: setbaud.py
+	# Autogenerate setbaud.asm
+	$(PYTHON) setbaud.py
+
+boot2.bin: setbaud.bin
+
 boot1.bin: boot2.bin
 
 test_packed.bin: test.raw.exo_b
 test2_packed.bin: test2.raw.exo_b
 
-test.tzx: boot1.bin test.scr buildtzx.py print.bin test_packed.bin
+test.tzx: boot1.bin test.scr buildtzx.py print.bin genfont.bin test_packed.bin
 	# Construct loader
 	$(PYTHON) buildtzx.py
 	# Add loading screen metadata to TZX
@@ -68,3 +74,4 @@ zx7compress: zx7/src/compress.c zx7/src/optimize.c zx7/src/zx7.c
 
 clean:
 	rm -f *.bin *.tzx *.wav *.asmgl *.exo *.exo_b *.exo_simple *.exo_simple_b *.zx7
+	rm -f setbaud.asm

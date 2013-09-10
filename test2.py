@@ -58,17 +58,25 @@ with open("print.asmgl") as labels:
     for line in labels:
         (label,dummy,value) = line.split()
         labelList[label]=int(value[1:-1],16)
+with open("setbaud.asmgl") as labels:
+    for line in labels:
+        (label,dummy,value) = line.split()
+        labelList[label]=int(value[1:-1],16)
 borderFlashAddr = labelList['BORDER_FLASH']
 borderMainAddr = labelList['BORDER_MAIN']
 borderErrorFlashAddr = labelList['BORDER_ERROR_FLASH']
 borderErrorMainAddr = labelList['BORDER_ERROR_MAIN']
 printRoutine = labelList['PRINT_ROUTINE']
 printParam = labelList['PRINT_PARAM']
+baud = labelList['BAUD'] # Note: baud rate is set in setbaud.py
 
 """
 Payload
 """
-payload = Versaload(baud=3000)
+# Note that baud rate is set in two places:
+# Below (for mastering) and near the bottom of boot2.asm (playback)
+#
+payload = Versaload(baud=baud)
 
 """
 Border functions
@@ -104,7 +112,7 @@ def printText(x,y,text):
     data = data + text
     data = data + pack("<B",0)
     payload.load(printParam,data)
-    payload.execute(printRoutine,0.01*len(text))
+    payload.execute(printRoutine,0.001*len(text))
 
 def printColourText(x,y,text,ink,paper,bright=False,flash=False):
     # Print message to screen, with attributes

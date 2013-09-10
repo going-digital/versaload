@@ -59,17 +59,28 @@ with open("print.asmgl") as labels:
     for line in labels:
         (label,dummy,value) = line.split()
         labelList[label]=int(value[1:-1],16)
+with open("setbaud.asmgl") as labels:
+    for line in labels:
+        (label,dummy,value) = line.split()
+        labelList[label]=int(value[1:-1],16)
+with open("genfont.asmgl") as labels:
+    for line in labels:
+        (label,dummy,value) = line.split()
+        labelList[label]=int(value[1:-1],16)
 borderFlashAddr = labelList['BORDER_FLASH']
 borderMainAddr = labelList['BORDER_MAIN']
 borderErrorFlashAddr = labelList['BORDER_ERROR_FLASH']
 borderErrorMainAddr = labelList['BORDER_ERROR_MAIN']
 printRoutine = labelList['PRINT_ROUTINE']
 printParam = labelList['PRINT_PARAM']
+genfontRoutine = labelList['GENFONT_ROUTINE']
+fontbaseAddr = labelList['FONTBASE']
+baud = labelList['BAUD'] # Note: baud rate is set in setbaud.py
 
 """
 Payload
 """
-payload = Versaload(baud=3000)
+payload = Versaload(baud=baud)
 
 """
 Border functions
@@ -101,11 +112,11 @@ def printText(x,y,text):
     # Print message to screen.
     # Restricted to character square positions, and char codes 32-127
     # Simple routine that does not support wrapping, colour or control codes
-    data = pack("<2H",0x3d00,0x4000+(y//8)*0x800+(y%8)*0x20+x)
+    data = pack("<2H",fontbaseAddr,0x4000+(y//8)*0x800+(y%8)*0x20+x)
     data = data + text
     data = data + pack("<B",0)
     payload.load(printParam,data)
-    payload.execute(printRoutine,0.01*len(text))
+    payload.execute(printRoutine,0.001*len(text))
 
 def printColourText(x,y,text,ink,paper,bright=False,flash=False):
     # Print message to screen, with attributes
@@ -131,7 +142,6 @@ def addScreen(screenData):
         y2=y*0x100
         for base in range(0x0000,0x1800,0x800):
             payload.load(0x4000+base+y2, screenData[base+y2:0x100+base+y2])
-
 
 """
 Debug: print string as hexadecimal
@@ -172,24 +182,32 @@ Construct payload
 """
 payload.delay(0.5)  # Wait for BASIC to execute. Let tape AGC settle.
 
+# Loading screen
+addScreen(optimiseScr(open("test.scr","rb").read()))
+
+# Change border colour / effect to match loading screen
 borderMain(1)   # Blue border
 borderFlash(0)  # Black flash
 borderErrorMain(2)   # Red border
 borderErrorFlash(0)  # Magenta flash
 
+# Generate bold character set
+payload.load(genfontRoutine,open("genfont.bin","rb").read())
+payload.execute(genfontRoutine,0.1)
 
-# Loading screen
-addScreen(optimiseScr(open("test.scr","rb").read()))
-
-# Change border colour / effect to match loading screen
 
 # Load print routine
 payload.load(printRoutine,open("print.bin","rb").read())
 printColourText(12,11,"Loading",7,2,bright=True)
 
+# Label baud rate
+printColourText(28,0,"{}".format(baud),0,1)
+printColourText(28,1,"baud",0,1)
+
 # Main code
 payloadBlock = open("test_packed.bin","rb").read()
 payload.load(0x5c00,payloadBlock[0:0x400])
+printColourText(12,11,"       ",7,0,bright=False)
 printText(1,23,"Hello World of Spectrum fans!")
 payload.load(0x6000,payloadBlock[0x400:0x800])
 printText(1,23,"                             ")
@@ -219,29 +237,12 @@ payload.load(0x9000,payloadBlock[0x3400:0x3800])
 printText(1,23,"But anyway, here's Penetrator!")
 payload.load(0x9400,payloadBlock[0x3800:])
 
-# # Complete load
+# Complete load
 payload.load(0x5b00, genFixup(0x7c00,0xfc00,0x400,0x5c00,0x5c00))
 printColourText(11,11,"Unpacking",7,2,bright=True)
 payload.execute(0x5b00,0)
 
-# Load relocate/execute code at 0x7000
-# This relocates the 0x7c00-0x7fff code block back to the correct place
-# and then jumps to the game entry point at 0x8000
-# Memory map whilst loading:
-#   0x4000-0x5AFF   Loading screen
-#   0x5B00-0x5B80   ZX7 decompressor
-#   0x6000-0xDFFF   Compressed image (may be less)
-# Memory map after loading complete, before executing fixup/decompressor
-#   0x4000-0x5AFF   Loading screen
-#   0x5B80-0x5C00   Fixup code
-
-#   0x8000-0xFFFF   Decompressed image
-#
-# addPayload(0x7000, genFixup(0x7c00,0xbc00,0x400,0x5fff,0x8000), datamod)
-
-# Execute relocate code, then game
-# addExec(0x7000)
-
+# Build TZX block for payload
 payloadblock = Blk_DRB(sampledata = payload.get().tobytes())
 payloadblock.tstatespersample(payload.tStatesPerSample())
 payloadblock.pause(0)
