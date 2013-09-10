@@ -10,6 +10,8 @@
 loadbase        equ     $BC00
 stackptr        equ     $C000
 printbase       equ     $be00
+genfont         equ     $f000
+fontbase        equ     $fd00
 
 ; Sync train
 ;
