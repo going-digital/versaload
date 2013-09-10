@@ -17,6 +17,7 @@
 ;       smB     jp m or jp p: Bit decision
 
         include "globals.inc"
+        include "setbaud.asm"   ; Baud rate settings
 
         org     loadbase
 
@@ -158,9 +159,9 @@ stage3: ; Read data and verify
         dec     hl              ; 6T [edge+207]
         ld      (nextblk),hl    ; 16T [edge+223]
         ; Clear loading error indication
-sm4:    ld      a,9             ; 7T [edge+230] Blue flash
+sm4:    ld      a,$9            ; 7T [edge+230] Blue flash
         ld      (sm9+1),a       ; 13T [edge+243]
-sm5:    ld      a,8             ; 7T [edge+230] Black border
+sm5:    ld      a,$f            ; 7T [edge+230] White border
         ld      (smA+1),a       ; 13T [edge+243]
         ; Synchronise for next block
         ld      hl,stage1       ; 10T [edge+253]
@@ -174,7 +175,7 @@ stageerr: ; Last block was corrupt
         ld      (sm3+1),hl      ; 16T [edge+66]
         ld      de,$ffff        ; 10T [edge+76]
         ; Set loading error indication
-sm6:    ld      a,$b            ; 7T [edge+83] Magenta flash
+sm6:    ld      a,$8            ; 7T [edge+83] Black flash
         ld      (sm9+1),a       ; 13T [edge+96]
 sm7:    ld      a,$a            ; 7T [edge+103] Red border
         ld      (smA+1),a       ; 13T [edge+116]
@@ -185,32 +186,15 @@ endstage:
         ; Loop to balance alternate code path timings
         ; 13 cycles per unit
 dellp:  djnz    dellp           ; Wait 0.75 bit periods
-        ; [edge+390T]
-        ; Baud rate adjustment
-sm8:    ld      b,37            ; 3000 baud
-del2lp: djnz    del2lp
 
+        ; [edge+390T]
+
+sm8:    ld      b,BAUDLOOPS     ; Set by setbaud.py
+del2lp: djnz    del2lp
 sm9:    ld      a,$9            ; Default flash blue
         out     ($fe),a
 smA:    ld      a,$f            ; Default border white
         out     ($fe),a
-
-        ; Next bit sample point
-        ; Baud 1b    0.75b Loops
-        ; 1500 2333T 1750T 105
-        ; 2000 1750T 1313T 71   Equiv to ROM
-        ; 2500 1400T 1050T 51
-        ; 3000 1167T 875T  37
-        ; 3500 1000T 750T  28
-        ; 4000 875T  656T  20   Equiv to Microsphere
-        ; 4500 778T  583T  15
-        ; 5000 700T  525T  10
-        ; 5500 636T  477T  7
-        ; 6000 583T  438T  4
-        ; 6500 538T  404T  1
-        ; 7000 500T  375T  n/a
-
-
         in      a,($fe)         ; 11T
         add     a,a             ; 4T
 smB:    jp      m,rx0           ; 10T
