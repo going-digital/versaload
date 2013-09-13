@@ -8,12 +8,14 @@ baud = 3000
 
 # Z80 clock speed
 #
-cpuClock = 3500000 # ZX Spectrum, ZX80, ZX81
+#cpuClock = 3500000 # ZX Spectrum 16/48K, ZX80, ZX81
+#cpuClock = 3546900 # Spectrum 128K, +2/2A/3
+cpuClock = 3523372 # Geometric mean, minimum error on all Spectrums
 #cpuClock = 4000000 # Amstrad CPC
 
 # Constants related to boot2.asm
 #
-loopOverhead = 390  # Fixed loop delay, in T-states
+loopOverhead = 738  # Fixed loop delay, in T-states
 cycleTime = 13      # One loop of a DJNZ delay, in T-states
 
 # Generate baud.asm file
