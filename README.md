@@ -4,12 +4,15 @@ Versaload
 ## Faster data encoding from cassette for retro platforms
 Versaload uses the accumulated tricks from reliable fast tape loaders of the past, adding modern techniques and a modern mastering system to achieve much improved loading times on retro machines using original tape equipment. To achieve this new speed, it uses several innovations:
 
+  * Countdown timer to load completion, in minutes and seconds.
+  * Pretty loading of the loading screen.
+  * Messages can be displayed during loading.
+  * Block based loading with graceful error handling. Tape loading error? Just rewind a few seconds and hit play to retry!
   * Uses Biphase Mark Coding modulation (as used in SMPTE/EBU Linear Time Codes), which gives a 50% speed improvement over ROM style modulation for the same timing.
-  * Block based loading. Tape loading error? Just rewind a few seconds and hit play to retry!
   * Easy to use data compression with state of the art packers - Exomiser 2 and ZX7.
   * Python based scriptable tape mastering environment, compatible with standard emulator file formats and audio output.
 
-With Microsphere timing, this gives a predicted rate of around *4500 bit∙s⁻¹*, 3 times the speed of the Spectrum default loader. Depending on content, compression can double that speed.
+Speeds of *3000-4500 bit∙s⁻¹* are achievable. Depending on content, compression can double that speed.
 
 More information on this is [in the wiki.](https://github.com/going-digital/versaload/wiki)
 
