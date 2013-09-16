@@ -23,8 +23,30 @@
 
         include "globals.inc"
         include "setbaud.asm"   ; Baud rate settings
+        include "sysvar.inc"
+        include "romhooks.inc"
 
         org     loadbase
+
+        ; CLEAR 23999
+        ; hl = clear location
+        ld      bc,23999        ; See Spectrum ROM disassembly $1EAC
+        push    bc
+        ld      de,(VARS)
+        ld      hl,(E_LINE)
+        dec     hl
+        call    RECLAIM_1
+;        call    CLS
+        pop     hl
+        ld      (RAMTOP),hl
+        pop     de              ; Pop STMT-RET
+        pop     bc              ; Pop error address
+        ld      (hl),$3e
+        dec     hl
+        ld      sp,hl
+        push    bc
+        ld      (ERR_SP),sp
+        push    de
 
 bmc:    ld      de,$ffff        ; Inhibit sync pattern detection for at least 16 bits
 
@@ -109,7 +131,6 @@ stage2: ; Read block header and verify
         jp      endstage        ; 10T [edge+?] Delay unknown. Resync after exec block.
 
 exec    jp      (ix)            ; 10T [edge+327]
-
 
 blkData:; Set up for data load
         ld      a,(blklen)      ;13T [edge+313] Set block length
@@ -238,21 +259,19 @@ s0_3:   call    delay64         ; [241] 17+64 [322]
 ; State 1: Decrement countdown counters in memory
 state1: ld      hl,(c_bits)     ; 16T [16] Decrement bits counter
         dec     hl              ; 6T [22]
-        bit     7,h
-        ; TODO: reflect overflow in carry flag
-        jp      z,c1           ; 10T [32]
-        ld      hl,BAUD/NUMSTATES; 10T [42] xx=bits per second / NUMSTATES = 750 for 3000baud, 4 states
-        ld      (c_bits),hl     ; 16T [58]
-        ld      a,(c_sec)       ; 13T [71] Decrement seconds
+        bit     7,h             ; 8T [30]
+        jp      z,c1            ; 10T [40]
+        ld      hl,BAUD/NUMSTATES; 10T [50] xx=bits per second / NUMSTATES = 750 for 3000baud, 4 states
+        ld      (c_bits),hl     ; 16T [66]
+        ld      a,(c_sec)       ; 13T [79] Decrement seconds
+        ; TODO: Recalculate timings below
         dec     a               ; 4T [75]
-        ; TODO: reflect overflow in carry flag. Use jp p?
         ld      (c_sec),a       ; 13T [88]
         jp      p,c2            ; 10T [98]
         ld      a,9             ; 7T [105]
         ld      (c_sec),a       ; 13T [118]
         ld      a,(c_tens)      ; 13T [131] Decrement tens of seconds
         dec     a               ; 4T [135]
-        ; TODO: reflect overflow in carry flag. Use jp p?
         ld      (c_tens),a      ; 13T [148]
         jp      p,c3            ; 10T [158]
         ld      a,5             ; 7T [165]
@@ -345,12 +364,31 @@ delay23:ld      a,(0)           ; [-23] 13T [-10]
 
 
 c_min:  db      1
-c_tens: db      0
-c_sec:  db      8
+c_tens: db      3
+c_sec:  db      7
 c_bits: dw      $1
 c_act:  db      $a5             ; Set to $a5 to activate countdown
 
 nextblk dw      0
+
+
+
+count_block:
+        db      1       ; Minutes
+        db      3       ; Tens of seconds
+        db      7       ; Seconds
+        dw      1       ; Fractions of a second, in state loops
+count_update:
+        db      0       ; Last byte of block: set to $a5 to load new values
+
+        ; Header block, 8 bytes long.
+headerParam:
+blknum  dw      0               ; Block number, incrementing from 0000
+blkaddr dw      0               ; Block address.
+blklen  db      0               ; Data length, 1-256 bytes (0=256 bytes)
+blktype db      0               ; 0: Load data. 1: Call code
+blksum  db      0               ; Checksum of data block (so additive sum = 0)
+blkhsum db      0               ; Checksum of header block (so additive sum = 0)
 
         ; Countdown character set
 chrset  db      $00,$38,$44,$44,$22,$22,$1c,$00 ; 0
@@ -363,24 +401,6 @@ chrset  db      $00,$38,$44,$44,$22,$22,$1c,$00 ; 0
         db      $00,$7c,$04,$08,$08,$08,$08,$00 ; 7
         db      $00,$38,$44,$38,$22,$22,$1c,$00 ; 8
         db      $00,$38,$44,$44,$1e,$02,$1c,$00 ; 9
-
-count_block:
-        db      1       ; Minutes
-        db      0       ; Tens of seconds
-        db      8       ; Seconds
-        dw      1       ; Fractions of a second, in state loops
-count_update:
-        db      0       ; Last byte of block: set to $a5 to load new values
-
-        ; Header block, 8 bytes long.
-headerParam:
-blknum  ds      2               ; Block number, incrementing from 0000
-blkaddr ds      2               ; Block address.
-blklen  ds      1               ; Data length, 1-256 bytes (0=256 bytes)
-blktype ds      1               ; 0: Load data. 1: Call code
-blksum  ds      1               ; Checksum of data block (so additive sum = 0)
-blkhsum ds      1               ; Checksum of header block (so additive sum = 0)
-
 
 ; Exports
 ;

@@ -153,7 +153,7 @@ Generate short machine code to relocate data, set SP and execute.
 Used at the final stage of loading to overwrite the versaload routine and
 correct the memory map, then execute the final payload.
 """
-def genFixup(src,dest,length,sp,pc):
+def genFixup(src,dest,length,pc):
     # Relocate memory block and execute payload
     # Z80 version
     """
@@ -161,17 +161,15 @@ def genFixup(src,dest,length,sp,pc):
         11 nn nn    ld      de,dest
         21 nn nn    ld      hl,src
         ed b0       ldir
-        31 nn nn    ld      sp,spValFinal
+        c1          pop     bc
         c3 nn nn    jp      pc
     """
-    data = pack("<BHBHBH3BHBH",\
-        0x01,length,\
-        0x11,dest,\
-        0x21,src,\
-        0xed,0xb0,\
-        0x31,sp,\
-        0xc3,pc\
-        )
+    data = pack("<BH",0x01,length)
+    data = data + pack("<BH",0x11,dest)
+    data = data + pack("<BH",0x21,src)
+    data = data + pack("<2B",0xed,0xb0)
+    data = data + pack("<B",0xc1)
+    data = data + pack("<BH",0xc3,pc)
     return data
 
 """
@@ -197,13 +195,16 @@ mainData = open("test2.raw","rb").read()
 printColourText(0,0,"Versaload",7,2,bright=True)
 printColourText(0,1,"test2 3000baud",7,2,bright=True)
 
+# Original is 6ae1 long, 0x5dc0 to c8a1
+# Load 0x5dc0..0xbc00
 payload.load(0x5dc0, mainData[0x0000:0x5e40])
 if len(mainData) > 0x5e40:
-    payload.load(0xfc00, mainData[0x5e40:0x6240])
+    # Load 0xbc00..0xc000 to 0xd000+
+    payload.load(0xd000, mainData[0x5e40:0x6240])
 if len(mainData) > 0x6240:
     payload.load(0xc000, mainData[0x6240:])
-payload.load(0x5b00, genFixup(0xfc00,0xbc00,0x400,0x5dc0,0x5dc0))
-payload.execute(0x5b00,0)
+payload.load(0x4000, genFixup(0xd000,0xbc00,0x400,0x5dc0))
+payload.execute(0x4000,0)
 
 
 payloadblock = Blk_DRB(sampledata = payload.get().tobytes())
