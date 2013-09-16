@@ -56,12 +56,12 @@ class Versaload:
             #
             # Split into 256 byte blocks
             #
-            print hex(self.__blockNumber),"Load",hex(address)
             dataBlock = data[:0x100]
             #
             # Build header
             #
             length = len(dataBlock) % 256
+            print hex(self.__blockNumber),"Load",hex(address),":",hex(address+length)
             dataChecksum = 0
             for byte in list(dataBlock):
                 dataChecksum = (dataChecksum + ord(byte)) % 256
