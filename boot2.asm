@@ -1,9 +1,5 @@
 ; This code _must_ execute in uncontended memory as it is time critical.
 
-; BMC decoder
-;
-
-; TODO: Recalculate memory map. Something is overwriting the code.
 ; TODO: Can we move some of this to a turboloaded block? BASIC loader is
 ; getting rather long.
 ;
@@ -28,15 +24,17 @@
 
         org     loadbase
 
-        ; CLEAR 23999
-        ; hl = clear location
-        ld      bc,23999        ; See Spectrum ROM disassembly $1EAC
+        ; CLEAR
+        ;
+        ; Reset RAMTOP etc
+        ; See the Spectrum ROM disassembly $1EAC
+        ;
+        ld      bc,clearbase
         push    bc
         ld      de,(VARS)
         ld      hl,(E_LINE)
         dec     hl
         call    RECLAIM_1
-;        call    CLS
         pop     hl
         ld      (RAMTOP),hl
         pop     de              ; Pop STMT-RET
@@ -48,8 +46,10 @@
         ld      (ERR_SP),sp
         push    de
 
-bmc:    ld      de,$ffff        ; Inhibit sync pattern detection for at least 16 bits
-
+        ; Now load from tape
+        ;
+        ld      de,$ffff        ; Inhibit sync pattern detection for at least 16 bits
+        di                      ; Interrupts off - time critical from here on
         ; Wait for positive edge, then sample at 0.75 bit periods
 waitEdge:
         in      a,($fe)         ; 11T [edge+11] Loop time 25T
@@ -188,8 +188,9 @@ sm6:    ld      a,$8            ; 7T [edge+83] Black flash
         ld      (sm9+1),a       ; 13T [edge+96]
 sm7:    ld      a,$a            ; 7T [edge+103] Red border
         ld      (smA+1),a       ; 13T [edge+116]
-        ld      b,30-10         ; 7T [edge+123]
-        jp      endstage        ; 10T [edge+133] -10 => 130T
+        ld      (c_act),a       ; 13T [edge+129] Pause countdown state
+        ld      b,30-11         ; 7T [edge+136]
+        jp      endstage        ; 10T [edge+146]
 
 endstage:
         ; Loop to balance alternate code path timings
@@ -238,23 +239,38 @@ rx0:    ld      a,ANDA_OPCODE   ; Just received a 0 bit. No need to invert.
 NUMSTATES equ 5
 
 ; State 0: Update countdown state with any new data
-state0: ld      a,(c_act)       ; 13T [13] Wait for first countdown info
-        cp      $a5             ; 7T [20]
-        ld      hl,state1       ; 10T [30] DEBUG: should be state0
-        jp      nz,s0_1         ; 10T [40]
-        ld      hl,state1       ; 10T [50]
-        ld      a,(count_update); 13T [63] Check for update block
+state0:
+
+        ; Is update available? if so use it.
+        ld      a,(count_update); 13T [63]
         cp      $a5             ; 7T [70]
-        jp      nz,s0_2         ; 10T [80]
-        ld      hl,count_update ; 10T [90] Update countdown
+        jp      nz,s0_a         ; 10T [80]
+
+        ; Atomic update to working count
+        ld      hl,count_block  ; 10T [90]
         ld      de,c_min        ; 10T [100]
         ld      bc,6            ; 10T [110]
         ldir                    ; 121T [231] LDIR takes 21*BC-5 T
-        jp      s0_3            ; 10T [241]
-s0_1:   call    delay23         ; [40] 17+23 [80]
-s0_2:   call    delay144        ; [80] 17+144 [241]
-s0_3:   call    delay64         ; [241] 17+64 [322]
-        jp      endstate        ; 10T [332]
+        xor     a               ; 4T [235]
+        ld      (count_update),a; 13T [248]
+        jp      s0_b            ; 10T [258]
+
+        ; Compensating delay if update didn't happen
+s0_a:   call    delay161        ; [80] 17+161 [258]
+
+        ; Is count active? If so, move to state 1
+s0_b:   ld      a,(c_act)       ; [258] 13T [271]
+        cp      $a5             ; 7T [278]
+        ld      hl,state0       ; 10T [288]
+        jp      nz,s0_c         ; 10T [298]
+        ld      hl,state1       ; 10T [308]
+        jp      s0_d            ; 10T [318]
+
+s0_c:   jp      s0_e            ; [298] 10T [308]
+s0_e:   jp      s0_f            ; 10T [318]
+s0_d:   and     a               ; [318] 4T [322]
+s0_f:   jp      endstate        ; 10T [332]
+
 
 ; State 1: Decrement countdown counters in memory
 state1: ld      hl,(c_bits)     ; 16T [16] Decrement bits counter
@@ -264,38 +280,38 @@ state1: ld      hl,(c_bits)     ; 16T [16] Decrement bits counter
         ld      hl,BAUD/NUMSTATES; 10T [50] xx=bits per second / NUMSTATES = 750 for 3000baud, 4 states
         ld      (c_bits),hl     ; 16T [66]
         ld      a,(c_sec)       ; 13T [79] Decrement seconds
+        dec     a               ; 4T [83]
+        ld      (c_sec),a       ; 13T [96]
+        jp      p,c2            ; 10T [106]
+        ld      a,9             ; 7T [113]
+        ld      (c_sec),a       ; 13T [126]
+        ld      a,(c_tens)      ; 13T [139] Decrement tens of seconds
+        dec     a               ; 4T [143]
+        ld      (c_tens),a      ; 13T [156]
+        jp      p,c3            ; 10T [166]
+        ld      a,5             ; 7T [173]
+        ld      (c_tens),a      ; 13T [186]
+        ld      a,(c_min)       ; 13T [199] Decrement minutes
+        dec     a               ; 4T [203]
+        ld      (c_min),a       ; 13T [216]
+        jp      s1end           ; 10T [226]
+c1:     ld      (c_bits),hl     ; 16T [56]
+        call    delay143        ; 17+143T [216]
+        jp      s1end           ; 10T [226]
+c2:     ld      (c_sec),a       ; 13T [119]
+        call    delay80         ; 17+80T [216]
+        jp      s1end           ; 10T [226]
+c3:     ld      (c_tens),a      ; 13T [179]
+        call    delay20         ; 17+20T [216]
+        jp      s1end           ; 10T [226]
         ; TODO: Recalculate timings below
-        dec     a               ; 4T [75]
-        ld      (c_sec),a       ; 13T [88]
-        jp      p,c2            ; 10T [98]
-        ld      a,9             ; 7T [105]
-        ld      (c_sec),a       ; 13T [118]
-        ld      a,(c_tens)      ; 13T [131] Decrement tens of seconds
-        dec     a               ; 4T [135]
-        ld      (c_tens),a      ; 13T [148]
-        jp      p,c3            ; 10T [158]
-        ld      a,5             ; 7T [165]
-        ld      (c_tens),a      ; 13T [178]
-        ld      a,(c_min)       ; 13T [191] Decrement minutes
-        dec     a               ; 4T [195]
-        ld      (c_min),a       ; 13T [208]
-        jp      s1end           ; 10T [218]
-c1:     ld      (c_bits),hl     ; 16T [48]
-        call    delay143        ; 17+143T [208]
-        jp      s1end           ; 10T [218]
-c2:     ld      (c_sec),a       ; 13T [111]
-        call    delay80         ; 17+80T [208]
-        jp      s1end           ; 10T [218]
-c3:     ld      (c_tens),a      ; 13T [171]
-        call    delay20         ; 17+20T [208]
-        jp      s1end           ; 10T [218]
-s1end:  call    delay77         ; 17+77T [312]
+s1end:  call    delay69         ; 17+69T [312]
         ld      hl,state2       ; 10T [322]
         jp      endstate        ; 10T [332]
 
 ; State 2: Display countdown minutes digit
 state2: ld      a,(c_min)       ; 13T [23] Print minutes digit
-cd1:    ld      hl,$50b9        ; 10T [33]
+cd1:    ld      hl,$50de        ; 10T [33]
         ld      (pdest+1),hl    ; 16T [49]
         call    printn          ; 17+246T [312]
         ld      hl,state3       ; 10T [322]
@@ -303,7 +319,7 @@ cd1:    ld      hl,$50b9        ; 10T [33]
 
 ; State 3: Display countdown minutes digit
 state3: ld      a,(c_tens)      ; 13T [23] Print tens digit
-cd2:    ld      hl,$50d9        ; 10T [33]
+cd2:    ld      hl,$50fe        ; 10T [33]
         ld      (pdest+1),hl    ; 16T [49]
         call    printn          ; 17+246T [312]
         ld      hl,state4       ; 10T [322]
@@ -311,7 +327,7 @@ cd2:    ld      hl,$50d9        ; 10T [33]
 
 ; State 4: Display countdown minutes digit
 state4: ld      a,(c_sec)       ; 13T [23] Print seconds digit
-cd3:    ld      hl,$50da        ; 10T [33]
+cd3:    ld      hl,$50ff        ; 10T [33]
         ld      (pdest+1),hl    ; 16T [49]
         call    printn          ; 17+246T [312]
         ld      hl,state0       ; 10T [322]
@@ -320,7 +336,7 @@ cd3:    ld      hl,$50da        ; 10T [33]
         ; Print number routine
         ; A = number to print, 0-9
         ; 
-printn: ld      de,chrset       ; 10T [33]
+printn: ld      de,chrset       ; 10T [33] ; $3d80
         add     a,a             ; 4T [4]
         add     a,a             ; 4T [8]
         add     a,a             ; 4T [12]
@@ -340,6 +356,10 @@ pdest:  ld      de,$4000        ; 10T [54] DE = screen address
 
 ; General purpose delay routines
 
+delay161:
+        and     a               ; [-161] 4 [-157]
+        and     a               ; 4 [-153]
+        jp      delay143        ; 10 [-143]
 delay143:
         call    delay20         ; [-143] 17+13 [-113]
         ld      a,(0)           ; [-113] 13 [-100]
@@ -354,11 +374,12 @@ d10:    ret                     ; [-10] 10T
 delay80:inc     hl              ; [-80] 6T [-74]
         jp      delay64         ; [-74] 10+64
 
-delay144:
-        call    delay77         ; [-144] 17+77 [-50]
-        cp      0               ; [-50] 7 [-43]
-        jp      d33             ; [-43] 10 [-33]
-d33:    jp      delay23         ; [-33] 10 [-23]
+delay69:call    delay20         ; [-69] 17+20 [-32]
+        nop                     ; [-32] 4 [-28]
+        nop                     ; [-28] 4 [-24]
+        nop                     ; [-24] 4 [-20]
+        jp      d10             ; [-20] 10+10
+
 delay23:ld      a,(0)           ; [-23] 13T [-10]
         ret
 
@@ -367,7 +388,7 @@ c_min:  db      1
 c_tens: db      3
 c_sec:  db      7
 c_bits: dw      $1
-c_act:  db      $a5             ; Set to $a5 to activate countdown
+c_act:  db      $0              ; Set to $a5 to activate countdown
 
 nextblk dw      0
 
@@ -391,16 +412,16 @@ blksum  db      0               ; Checksum of data block (so additive sum = 0)
 blkhsum db      0               ; Checksum of header block (so additive sum = 0)
 
         ; Countdown character set
-chrset  db      $00,$38,$44,$44,$22,$22,$1c,$00 ; 0
-        db      $00,$10,$30,$10,$08,$08,$3e,$00 ; 1
-        db      $00,$38,$44,$04,$1c,$20,$3e,$00 ; 2
-        db      $00,$38,$44,$18,$02,$22,$1c,$00 ; 3
-        db      $00,$40,$40,$48,$3e,$04,$04,$00 ; 4
-        db      $00,$7c,$40,$78,$02,$02,$3c,$00 ; 5
-        db      $00,$38,$40,$78,$22,$22,$1c,$00 ; 6
-        db      $00,$7c,$04,$08,$08,$08,$08,$00 ; 7
-        db      $00,$38,$44,$38,$22,$22,$1c,$00 ; 8
-        db      $00,$38,$44,$44,$1e,$02,$1c,$00 ; 9
+chrset  db      $1e,$3b,$6b,$63,$63,$62,$3c,$00 ; 0
+        db      $0c,$1c,$3c,$0c,$0c,$0d,$3f,$60 ; 1
+        db      $3e,$63,$43,$1e,$3d,$63,$7f,$00 ; 2
+        db      $7f,$63,$46,$0e,$03,$63,$3e,$00 ; 3
+        db      $0e,$0c,$6c,$ed,$6f,$7f,$0c,$18 ; 4
+        db      $7f,$63,$61,$7e,$03,$63,$be,$00 ; 5
+        db      $3e,$63,$60,$6e,$7b,$63,$3e,$00 ; 6
+        db      $7f,$63,$43,$16,$0c,$1a,$18,$00 ; 7
+        db      $3e,$63,$63,$3e,$63,$63,$3e,$00 ; 8
+        db      $3e,$63,$6f,$3b,$03,$63,$3e,$00 ; 9
 
 ; Exports
 ;
@@ -415,3 +436,5 @@ COUNT_TENS              equ     cd2+1   ; Screen address of tens digit
 COUNT_SECS              equ     cd3+1   ; Screen address of secs digit
 COUNT_BLOCK             equ     count_block
 COUNT_CHRSET            equ     chrset  ; Countdown character set
+COUNT_DISABLE           equ     c_act
+COUNT_STATES            equ     NUMSTATES

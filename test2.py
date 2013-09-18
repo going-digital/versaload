@@ -33,7 +33,7 @@ tape.add_block(infoblock)
 Loader
 """
 loaderprog = open("boot1.bin","rb").read()
-loaderheader = ZX_FileHdr(SPEC_FILE_PROG, '\x16\x0b\x0cLoading', 0, 1, 0)
+loaderheader = ZX_FileHdr(SPEC_FILE_PROG, '\x16\x0b\x0cLoading', 0, 0, 0)
 loaderdata = ZX_FileData(loaderprog)
 loaderheader.setdatalen(loaderdata.datalen())
 loaderblock1 = Blk_SSDB(data=loaderheader.get())
@@ -69,6 +69,9 @@ borderErrorMainAddr = labelList['BORDER_ERROR_MAIN']
 printRoutine = labelList['PRINT_ROUTINE']
 printParam = labelList['PRINT_PARAM']
 baud = labelList['BAUD'] # Note: baud rate is set in setbaud.py
+countBlock = labelList['COUNT_BLOCK']
+countDisable = labelList['COUNT_DISABLE']
+countStates = labelList['COUNT_STATES']
 
 """
 Payload
@@ -104,6 +107,10 @@ This allows printing to the screen using ROM or custom character sets.
 Print functions will not work until print function has been loaded on Spectrum
 side.
 """
+def initPrint():
+    # Load print routine
+    payload.load(printRoutine,open("print.bin","rb").read())
+
 def printText(x,y,text):
     # Print message to screen.
     # Restricted to character square positions, and char codes 32-127
@@ -114,16 +121,35 @@ def printText(x,y,text):
     payload.load(printParam,data)
     payload.execute(printRoutine,0.001*len(text))
 
-def printColourText(x,y,text,ink,paper,bright=False,flash=False):
-    # Print message to screen, with attributes
+def setAttr(x,y,length,ink,paper,bright=False,flash=False):
     attrData = ink + 8*paper
     if bright:
         attrData = attrData + 0x40
     if flash:
         attrData = attrData + 0x80
     attrAddr = 0x5800 + y*32 + x
-    payload.load(attrAddr,pack("<B",attrData)*len(text))
+    payload.load(attrAddr,pack("<B",attrData)*length)
+
+def printColourText(x,y,text,ink,paper,bright=False,flash=False):
+    setAttr(x,y,len(text),ink,paper,bright,flash)
     printText(x,y,text)
+
+"""
+Countdown functions
+"""
+def countTime(bits):
+    secs = bits // baud
+    bits %= baud
+    mins = secs // 60
+    secs %= 60
+    bits //= countStates
+    if bits == 0:
+        # This would be read as 65536 bits. Add 1 bit to fix things up.
+        bits = 1
+    data = pack("<3BHB",mins,secs//10,secs%10,bits,0xa5)
+    payload.load(countBlock,data)
+def countDisable():
+    payload.load(countDisable,pack("<B",0x00))
 
 """
 Screen loader
@@ -177,33 +203,69 @@ Construct payload
 """
 payload.delay(0.5)  # Wait for BASIC to execute. Let tape AGC settle.
 
+# Set up border colours for the load
+#
 borderMain(7)       # Blue border
 borderFlash(2)      # Black flash
 borderErrorMain(2)  # Red border
 borderErrorFlash(0) # Magenta flash
 
-# Loading screen
-addScreen(optimiseScr(open("test2.scr","rb").read()))
+# Prepare loading screen
+#
+# Maximise use of paper by flipping character squares
+screen = optimiseScr(open("test2.scr","rb").read())
+# Place 'm' at (31,22) for countdown timer and set up attributes for timer
+screenmod = screen[0:0x10df] + pack("<B",0xe3)
+screenmod += screen[0x10e0:0x11df] + pack("<B",0x77)
+screenmod += screen[0x11e0:0x12df] + pack("<B",0x7f)
+screenmod += screen[0x12e0:0x13df] + pack("<B",0x6b)
+screenmod += screen[0x13e0:0x14df] + pack("<B",0x63)
+screenmod += screen[0x14e0:0x15df] + pack("<B",0x73)
+screenmod += screen[0x15e0:0x16df] + pack("<B",0xc6)
+screenmod += screen[0x16e0:0x17df] + pack("<B",0x00)
+screenmod += screen[0x17e0:0x1ade] + pack("<2B",0x72,0x7b)
+screenmod += screen[0x1ae0:0x1afe] + pack("<2B",0x72,0x72)
 
-# Load print routine
-payload.load(printRoutine,open("print.bin","rb").read())
+# Load loading screen
+#
+addScreen(screenmod)
 
 # Main code
 mainData = open("test2.raw","rb").read()
 
-# Load 0x5c00-0xbbff into final location
-printColourText(0,0,"Versaload",7,2,bright=True)
-printColourText(0,1,"test2 3000baud",7,2,bright=True)
+# Estimate payload length, for countdown timer
+payloadBits = len(mainData) * 8 * (256*8+200) / (256*8) + baud/2
+
+# Turn on countdown timer
+def loadWithCountdown(addr, data, bits):
+    while len(data) > 0:
+        countTime(bits)
+        bits -= 80+40 # Allowance for countdown block
+        payload.load(addr,data[0:0x100])
+
+        # Adjust parameters for next time around
+        bits -= 80 # Allowance for data header
+        bits -= 8*len(data[0:0x100])
+        addr += len(data[0:0x100])
+        data = data[0x100:]
+    return bits
 
 # Original is 6ae1 long, 0x5dc0 to c8a1
 # Load 0x5dc0..0xbc00
-payload.load(0x5dc0, mainData[0x0000:0x5e40])
+payloadBits = loadWithCountdown(0x5dc0, mainData[0x0000:0x5e40],payloadBits)
 if len(mainData) > 0x5e40:
     # Load 0xbc00..0xc000 to 0xd000+
-    payload.load(0xd000, mainData[0x5e40:0x6240])
+    payloadBits = loadWithCountdown(0xd000, mainData[0x5e40:0x6240],payloadBits)
 if len(mainData) > 0x6240:
-    payload.load(0xc000, mainData[0x6240:])
+    payloadBits = loadWithCountdown(0xc000, mainData[0x6240:],payloadBits)
+payload.load(0xb493, pack("<H",5))
 payload.load(0x4000, genFixup(0xd000,0xbc00,0x400,0x5dc0))
+
+# Hide countdown timer - loading is complete
+#setAttr(30,22,2,6,6,bright=True)
+#setAttr(30,23,2,6,6,bright=True)
+
+# Execute game
 payload.execute(0x4000,0)
 
 

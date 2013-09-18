@@ -16,6 +16,7 @@
 ;   $f000-$f0ff Loader character set generator
 ;   $fd00-$ffff Loader print character set
 
+clearbase       equ     $5dbf
 loadbase        equ     $BC00
 printbase       equ     $ef00
 genfont         equ     $f000
