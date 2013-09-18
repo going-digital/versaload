@@ -384,10 +384,10 @@ delay23:ld      a,(0)           ; [-23] 13T [-10]
         ret
 
 
-c_min:  db      1
-c_tens: db      3
-c_sec:  db      7
-c_bits: dw      $1
+c_min:  db      0
+c_tens: db      0
+c_sec:  db      0
+c_bits: dw      $0
 c_act:  db      $0              ; Set to $a5 to activate countdown
 
 nextblk dw      0
@@ -395,10 +395,10 @@ nextblk dw      0
 
 
 count_block:
-        db      1       ; Minutes
-        db      3       ; Tens of seconds
-        db      7       ; Seconds
-        dw      1       ; Fractions of a second, in state loops
+        db      0       ; Minutes
+        db      0       ; Tens of seconds
+        db      0       ; Seconds
+        dw      0       ; Fractions of a second, in state loops
 count_update:
         db      0       ; Last byte of block: set to $a5 to load new values
 

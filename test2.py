@@ -205,10 +205,10 @@ payload.delay(0.5)  # Wait for BASIC to execute. Let tape AGC settle.
 
 # Set up border colours for the load
 #
-borderMain(7)       # Blue border
-borderFlash(2)      # Black flash
+borderMain(7)       # White border
+borderFlash(2)      # Red flash
 borderErrorMain(2)  # Red border
-borderErrorFlash(0) # Magenta flash
+borderErrorFlash(0) # Black flash
 
 # Prepare loading screen
 #
@@ -258,7 +258,7 @@ if len(mainData) > 0x5e40:
     payloadBits = loadWithCountdown(0xd000, mainData[0x5e40:0x6240],payloadBits)
 if len(mainData) > 0x6240:
     payloadBits = loadWithCountdown(0xc000, mainData[0x6240:],payloadBits)
-payload.load(0xb493, pack("<H",5))
+payload.load(0xb493, pack("<H",5)) # Einar's patch to shorten startup delay
 payload.load(0x4000, genFixup(0xd000,0xbc00,0x400,0x5dc0))
 
 # Hide countdown timer - loading is complete
